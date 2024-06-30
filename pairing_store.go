@@ -12,26 +12,27 @@ type pairingStore struct {
 }
 
 func newPairingStore(storage string) (*pairingStore, error) {
-	p := &pairingStore{path: storage}
-	b, err := os.ReadFile(p.path)
+	p := &pairingStore{
+		path:   storage,
+		values: make(map[string]*PairingInfo),
+	}
 
+	b, err := os.ReadFile(p.path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			parent := filepath.Dir(p.path)
 			err = os.MkdirAll(parent, 0750)
-
 			if err != nil {
 				return nil, err
 			}
-
-			p.values = map[string]*PairingInfo{}
 		} else {
 			return nil, err
 		}
 	} else {
 		err = json.Unmarshal(b, &p.values)
-
 		if err != nil {
+			p.values = make(map[string]*PairingInfo)
+			l("error at newPairingStore is %+v", err)
 			return nil, err
 		}
 	}
