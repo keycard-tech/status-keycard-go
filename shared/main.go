@@ -7,6 +7,7 @@ import "C"
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"unsafe"
 
 	skg "github.com/status-im/status-keycard-go"
@@ -40,7 +41,10 @@ func jsonToParams(jsonParams *C.char) (skg.FlowParams, error) {
 //export KeycardInitFlow
 func KeycardInitFlow(storageDir *C.char) *C.char {
 	var err error
+	l("before skg.NewFlow(C.GoString(storageDir))")
+	l("value of storageDir is -> %v", storageDir)
 	globalFlow, err = skg.NewFlow(C.GoString(storageDir))
+	l("error is  %+v", err)
 
 	return retErr(err)
 }
@@ -108,4 +112,9 @@ func MockedLibKeycardInserted(cardIndex C.int) *C.char {
 //export MockedLibKeycardRemoved
 func MockedLibKeycardRemoved() *C.char {
 	return retErr(notAvailable)
+}
+
+func l(format string, args ...interface{}) {
+	f := fmt.Sprintf("keycard - %s\n", format)
+	fmt.Printf(f, args...)
 }
