@@ -17,11 +17,12 @@ func newPairingStore(storage string) (*pairingStore, error) {
 		values: make(map[string]*PairingInfo),
 	}
 
+	l("attempting to read filepath is %+v", p.path)
 	b, err := os.ReadFile(p.path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			parent := filepath.Dir(p.path)
-			err = os.MkdirAll(parent, 0750)
+			err = os.MkdirAll(parent, 0755)
 			if err != nil {
 				return nil, err
 			}
