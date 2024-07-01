@@ -28,6 +28,7 @@ func NewFlow(storageDir string) (*KeycardFlow, error) {
 	p, err := newPairingStore(storageDir)
 
 	if err != nil {
+		l("error at os.ReadFile with path logged above is %+v", err)
 		return nil, err
 	}
 

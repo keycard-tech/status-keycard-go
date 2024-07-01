@@ -19,14 +19,17 @@ func newPairingStore(storage string) (*pairingStore, error) {
 
 	l("attempting to read filepath is %+v", p.path)
 	b, err := os.ReadFile(p.path)
+	l("error at os.ReadFile with path logged above is %+v", err)
 	if err != nil {
 		if os.IsNotExist(err) {
 			parent := filepath.Dir(p.path)
 			err = os.MkdirAll(parent, 0755)
 			if err != nil {
+				l("error at os.MkdirAll(parent, 0755) is %+v", err)
 				return nil, err
 			}
 		} else {
+			l("error at !os.IsNotExist(err) is %+v", err)
 			return nil, err
 		}
 	} else {
@@ -37,7 +40,7 @@ func newPairingStore(storage string) (*pairingStore, error) {
 			return nil, err
 		}
 	}
-
+	l("no error at newPairingStore and value of pairingStore is %+v", p)
 	return p, nil
 }
 
