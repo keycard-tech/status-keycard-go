@@ -2,6 +2,8 @@ package statuskeycardgo
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -12,35 +14,35 @@ type pairingStore struct {
 }
 
 func newPairingStore(storage string) (*pairingStore, error) {
+	if storage == "" {
+		l("storage path was empty")
+		return nil, errors.New("storage path cannot be empty")
+	}
+
 	p := &pairingStore{
-		path:   storage,
+		path:   filepath.Clean(storage),
 		values: make(map[string]*PairingInfo),
 	}
 
-	l("attempting to read filepath is %+v", p.path)
+	if err := os.MkdirAll(filepath.Dir(p.path), 0755); err != nil {
+		l("failed to create directory: %w", err)
+		return nil, fmt.Errorf("failed to create directory: %w", err)
+	}
+
 	b, err := os.ReadFile(p.path)
-	l("error at os.ReadFile with path logged above is %+v", err)
 	if err != nil {
-		if os.IsNotExist(err) {
-			parent := filepath.Dir(p.path)
-			err = os.MkdirAll(parent, 0755)
-			if err != nil {
-				l("error at os.MkdirAll(parent, 0755) is %+v", err)
-				return nil, err
-			}
-		} else {
-			l("error at !os.IsNotExist(err) is %+v", err)
-			return nil, err
+		if !os.IsNotExist(err) {
+			l("failed to read file: %w", err)
+			return nil, fmt.Errorf("failed to read file: %w", err)
 		}
+		// File doesn't exist, which is fine for a new store
 	} else {
-		err = json.Unmarshal(b, &p.values)
-		if err != nil {
-			p.values = make(map[string]*PairingInfo)
-			l("error at newPairingStore is %+v", err)
-			return nil, err
+		if err := json.Unmarshal(b, &p.values); err != nil {
+			l("failed to parse JSON: %w", err)
+			return nil, fmt.Errorf("failed to parse JSON: %w", err)
 		}
 	}
-	l("no error at newPairingStore and value of pairingStore is %+v", p)
+
 	return p, nil
 }
 
