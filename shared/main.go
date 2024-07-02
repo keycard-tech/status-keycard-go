@@ -17,12 +17,13 @@ import (
 func main() {}
 
 var notAvailable = errors.New("not available in this context")
+var ok = errors.New("ok")
 
 var globalFlow *skg.KeycardFlow
 
 func retErr(err error) *C.char {
 	if err == nil {
-		return C.CString("ok")
+		return C.CString(ok.Error())
 	} else {
 		return C.CString(err.Error())
 	}
@@ -44,7 +45,7 @@ func KeycardInitFlow(storageDir *C.char) *C.char {
 	l("before skg.NewFlow(C.GoString(storageDir))")
 	l("value of storageDir is -> %v", storageDir)
 	globalFlow, err = skg.NewFlow(C.GoString(storageDir))
-	l("error is  %+v", err)
+	l("error is %+v", err)
 
 	return retErr(err)
 }
