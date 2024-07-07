@@ -2,6 +2,8 @@ package statuskeycardgo
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -12,27 +14,32 @@ type pairingStore struct {
 }
 
 func newPairingStore(storage string) (*pairingStore, error) {
-	p := &pairingStore{path: storage}
+	if storage == "" {
+		l("storage path was empty")
+		return nil, errors.New("storage path cannot be empty")
+	}
+
+	p := &pairingStore{
+		path:   filepath.Clean(storage),
+		values: make(map[string]*PairingInfo),
+	}
+
+	if err := os.MkdirAll(filepath.Dir(p.path), 0755); err != nil {
+		l("failed to create directory: %w", err)
+		return nil, fmt.Errorf("failed to create directory: %w", err)
+	}
+
 	b, err := os.ReadFile(p.path)
-
 	if err != nil {
-		if os.IsNotExist(err) {
-			parent := filepath.Dir(p.path)
-			err = os.MkdirAll(parent, 0750)
-
-			if err != nil {
-				return nil, err
-			}
-
-			p.values = map[string]*PairingInfo{}
-		} else {
-			return nil, err
+		if !os.IsNotExist(err) {
+			l("failed to read file: %w", err)
+			return nil, fmt.Errorf("failed to read file: %w", err)
 		}
+		// File doesn't exist, which is fine for a new store
 	} else {
-		err = json.Unmarshal(b, &p.values)
-
-		if err != nil {
-			return nil, err
+		if err := json.Unmarshal(b, &p.values); err != nil {
+			l("failed to parse JSON: %w", err)
+			return nil, fmt.Errorf("failed to parse JSON: %w", err)
 		}
 	}
 
