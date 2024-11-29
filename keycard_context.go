@@ -326,16 +326,16 @@ func (kc *keycardContext) signWithPath(data []byte, path string) (*types.Signatu
 	return sig, nil
 }
 
-func (kc *keycardContext) exportKey(derive bool, makeCurrent bool, onlyPublic bool, path string) (*KeyPair, error) {
+func (kc *keycardContext) exportKey(derive bool, makeCurrent bool, p2 uint8, path string) (*KeyPair, error) {
 	address := ""
-	privKey, pubKey, err := kc.cmdSet.ExportKey(derive, makeCurrent, onlyPublic, path)
+	exportedKey, err := kc.cmdSet.ExportKeyExtended(derive, makeCurrent, p2, path)
 	if err != nil {
 		l("exportKey failed %+v", err)
 		return nil, err
 	}
 
-	if pubKey != nil {
-		ecdsaPubKey, err := crypto.UnmarshalPubkey(pubKey)
+	if exportedKey.PubKey() != nil {
+		ecdsaPubKey, err := crypto.UnmarshalPubkey(exportedKey.PubKey())
 		if err != nil {
 			return nil, err
 		}
@@ -343,7 +343,7 @@ func (kc *keycardContext) exportKey(derive bool, makeCurrent bool, onlyPublic bo
 		address = crypto.PubkeyToAddress(*ecdsaPubKey).Hex()
 	}
 
-	return &KeyPair{Address: address, PublicKey: pubKey, PrivateKey: privKey}, nil
+	return &KeyPair{Address: address, PublicKey: exportedKey.PubKey(), PrivateKey: exportedKey.PrivKey(), ChainCode: exportedKey.ChainCode()}, nil
 }
 
 func (kc *keycardContext) loadSeed(seed []byte) ([]byte, error) {

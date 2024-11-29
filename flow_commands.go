@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	keycard "github.com/status-im/keycard-go"
 	"github.com/status-im/keycard-go/apdu"
 	"github.com/status-im/keycard-go/derivationpath"
 	ktypes "github.com/status-im/keycard-go/types"
@@ -33,6 +34,7 @@ func (f *KeycardFlow) selectKeycard(kc *keycardContext) error {
 	f.cardInfo.instanceUID = btox(appInfo.InstanceUID)
 	f.cardInfo.keyUID = btox(appInfo.KeyUID)
 	f.cardInfo.freeSlots = bytesToInt(appInfo.AvailableSlots)
+	f.cardInfo.version = bytesToInt(appInfo.Version)
 
 	if !appInfo.Installed {
 		return f.pauseAndRestart(SwapCard, ErrorNotAKeycard)
@@ -371,7 +373,18 @@ func (f *KeycardFlow) storeMetadata(kc *keycardContext) error {
 }
 
 func (f *KeycardFlow) exportKey(kc *keycardContext, path string, onlyPublic bool) (*KeyPair, error) {
-	keyPair, err := kc.exportKey(true, path == masterPath, onlyPublic, path)
+	var p2 uint8
+	if onlyPublic {
+		p2 = keycard.P2ExportKeyPublicOnly
+	} else {
+		p2 = keycard.P2ExportKeyPrivateAndPublic
+	}
+
+	return f.exportKeyExtended(kc, path, p2)
+}
+
+func (f *KeycardFlow) exportKeyExtended(kc *keycardContext, path string, p2 uint8) (*KeyPair, error) {
+	keyPair, err := kc.exportKey(true, path == masterPath, p2, path)
 
 	if isSCardError(err) {
 		return nil, restartErr()
