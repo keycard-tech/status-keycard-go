@@ -4,9 +4,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/keycard-go"
 	"github.com/status-im/status-keycard-go/internal"
 	"github.com/status-im/status-keycard-go/pkg/pairing"
+	"github.com/status-im/status-keycard-go/signal"
 )
 
 type cardStatus struct {
@@ -15,6 +16,7 @@ type cardStatus struct {
 	freeSlots   int
 	pinRetries  int
 	pukRetries  int
+	version     int
 }
 
 type KeycardFlow struct {
@@ -326,17 +328,27 @@ func (f *KeycardFlow) exportKeysFlow(kc *internal.KeycardContext, recover bool) 
 		}
 		result[EIP1581Key] = key
 
-		key, err = f.exportKey(kc, WalletRoothPath, true)
+		var exportP2 uint8
+
+		if f.cardInfo.version < 0x0310 {
+			exportP2 = keycard.P2ExportKeyPublicOnly
+		} else {
+			exportP2 = keycard.P2ExportKeyExtendedPublic
+		}
+
+		key, err = f.exportKeyExtended(kc, WalletRoothPath, exportP2)
 		if err != nil {
 			return nil, err
 		}
 		result[WalleRootKey] = key
 
-		key, err = f.exportKey(kc, WalletPath, true)
-		if err != nil {
-			return nil, err
+		if key.ChainCode == nil {
+			key, err = f.exportKey(kc, WalletPath, true)
+			if err != nil {
+				return nil, err
+			}
+			result[WalletKey] = key
 		}
-		result[WalletKey] = key
 
 		key, err = f.exportKey(kc, MasterPath, true)
 		if err != nil {
