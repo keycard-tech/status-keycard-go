@@ -24,6 +24,7 @@ type KeycardFlow struct {
 	pairings *pairingStore
 	params   FlowParams
 	cardInfo cardStatus
+	knownCA  []string
 }
 
 func NewFlow(storageDir string) (*KeycardFlow, error) {
@@ -36,9 +37,21 @@ func NewFlow(storageDir string) (*KeycardFlow, error) {
 	flow := &KeycardFlow{
 		wakeUp:   make(chan (struct{})),
 		pairings: p,
+		knownCA:  []string{},
 	}
 
 	return flow, nil
+}
+
+func NewFlowWithCA(storageDir string, knownCA []string) (*KeycardFlow, error) {
+	f, err := NewFlow(storageDir)
+
+	if err != nil {
+		return nil, err
+	}
+
+	f.knownCA = knownCA
+	return f, nil
 }
 
 func (f *KeycardFlow) Start(flowType FlowType, params FlowParams) error {

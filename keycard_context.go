@@ -2,6 +2,7 @@ package statuskeycardgo
 
 import (
 	"crypto/sha512"
+	"encoding/hex"
 	"errors"
 	"runtime"
 	"time"
@@ -220,6 +221,16 @@ func (kc *keycardContext) selectApplet() (*types.ApplicationInfo, error) {
 	}
 
 	return kc.cmdSet.ApplicationInfo, nil
+}
+
+func (kc *keycardContext) identify() (string, error) {
+	ca, err := kc.cmdSet.Identify()
+
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(ca), nil
 }
 
 func (kc *keycardContext) pair(pairingPassword string) (*types.PairingInfo, error) {
