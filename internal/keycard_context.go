@@ -2,6 +2,7 @@ package internal
 
 import (
 	"crypto/sha512"
+	"encoding/hex"
 	"errors"
 	"runtime"
 	"time"
@@ -220,6 +221,16 @@ func (kc *KeycardContext) SelectApplet() (*types.ApplicationInfo, error) {
 	}
 
 	return kc.cmdSet.ApplicationInfo, nil
+}
+
+func (kc *KeycardContext) Identify() (string, error) {
+	ca, err := kc.cmdSet.Identify()
+
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(ca), nil
 }
 
 func (kc *KeycardContext) Pair(pairingPassword string) (*types.PairingInfo, error) {

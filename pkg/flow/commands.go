@@ -130,6 +130,20 @@ func (f *KeycardFlow) initCard(kc *internal.KeycardContext) error {
 	return restartErr()
 }
 
+func (f *KeycardFlow) verifyAuthenticity(kc *internal.KeycardContext) error {
+	if (len(f.knownCA) == 0) || (f.cardInfo.instanceUID == f.params[SkipAuthUID]) {
+		return nil
+	}
+
+	ca, err := kc.Identify()
+
+	if (err != nil) || !internal.ContainsString(ca, f.knownCA) {
+		return authenticityErr()
+	}
+
+	return nil
+}
+
 func (f *KeycardFlow) openSC(kc *internal.KeycardContext, giveup bool) error {
 	var pairing *internal.PairingInfo
 
@@ -161,11 +175,17 @@ func (f *KeycardFlow) openSC(kc *internal.KeycardContext, giveup bool) error {
 		f.pairings.Delete(f.cardInfo.instanceUID)
 	}
 
+	err := f.verifyAuthenticity(kc)
+
+	if err != nil {
+		return err
+	}
+
 	if giveup {
 		return giveupErr()
 	}
 
-	err := f.pair(kc)
+	err = f.pair(kc)
 
 	if err != nil {
 		return err
