@@ -355,13 +355,13 @@ func (f *KeycardFlow) exportKeysFlow(kc *internal.KeycardContext, recover bool) 
 		}
 		result[WalleRootKey] = key
 
-		if key.ChainCode == nil {
-			key, err = f.exportKey(kc, WalletPath, true)
-			if err != nil {
-				return nil, err
-			}
-			result[WalletKey] = key
+		//if key.ChainCode == nil {
+		key, err = f.exportKey(kc, WalletPath, true)
+		if err != nil {
+			return nil, err
 		}
+		result[WalletKey] = key
+		//}
 
 		key, err = f.exportKey(kc, MasterPath, true)
 		if err != nil {
