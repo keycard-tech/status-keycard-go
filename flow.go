@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/status-im/keycard-go"
 	"github.com/status-im/status-keycard-go/signal"
 )
 
@@ -13,6 +14,7 @@ type cardStatus struct {
 	freeSlots   int
 	pinRetries  int
 	pukRetries  int
+	version     int
 }
 
 type KeycardFlow struct {
@@ -22,6 +24,7 @@ type KeycardFlow struct {
 	pairings *pairingStore
 	params   FlowParams
 	cardInfo cardStatus
+	knownCA  []string
 }
 
 func NewFlow(storageDir string) (*KeycardFlow, error) {
@@ -34,9 +37,21 @@ func NewFlow(storageDir string) (*KeycardFlow, error) {
 	flow := &KeycardFlow{
 		wakeUp:   make(chan (struct{})),
 		pairings: p,
+		knownCA:  []string{},
 	}
 
 	return flow, nil
+}
+
+func NewFlowWithCA(storageDir string, knownCA []string) (*KeycardFlow, error) {
+	f, err := NewFlow(storageDir)
+
+	if err != nil {
+		return nil, err
+	}
+
+	f.knownCA = knownCA
+	return f, nil
 }
 
 func (f *KeycardFlow) Start(flowType FlowType, params FlowParams) error {
@@ -324,17 +339,27 @@ func (f *KeycardFlow) exportKeysFlow(kc *keycardContext, recover bool) (FlowStat
 		}
 		result[EIP1581Key] = key
 
-		key, err = f.exportKey(kc, walletRoothPath, true)
+		var exportP2 uint8
+
+		if f.cardInfo.version < 0x0310 {
+			exportP2 = keycard.P2ExportKeyPublicOnly
+		} else {
+			exportP2 = keycard.P2ExportKeyExtendedPublic
+		}
+
+		key, err = f.exportKeyExtended(kc, walletRoothPath, exportP2)
 		if err != nil {
 			return nil, err
 		}
 		result[WalleRootKey] = key
 
+		//if key.ChainCode == nil {
 		key, err = f.exportKey(kc, walletPath, true)
 		if err != nil {
 			return nil, err
 		}
 		result[WalletKey] = key
+		//}
 
 		key, err = f.exportKey(kc, masterPath, true)
 		if err != nil {
