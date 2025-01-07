@@ -1,4 +1,4 @@
-package statuskeycardgo
+package flow
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 
 type MockedKeycardFlow struct {
 	flowType FlowType
-	state    runState
+	state    RunState
 	params   FlowParams
 	pairings *pairing.Store
 

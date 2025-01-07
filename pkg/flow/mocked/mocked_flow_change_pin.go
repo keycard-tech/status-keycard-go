@@ -1,11 +1,11 @@
-package statuskeycardgo
+package flow
 
 import (
 	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
 )
 
-func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
+func (mkf *MockedKeycardFlow) handleChangePinFlow() {
 	flowStatus := FlowStatus{}
 
 	if mkf.insertedKeycard.NotStatusKeycard {
@@ -18,18 +18,24 @@ func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
 		return
 	}
 
-	finalType := SwapCard
 	flowStatus = FlowStatus{
 		InstanceUID: mkf.insertedKeycard.InstanceUID,
 		KeyUID:      mkf.insertedKeycard.KeyUID,
 	}
 
-	if mkf.insertedKeycard.InstanceUID == "" || mkf.insertedKeycard.KeyUID == "" {
-		finalType = SwapCard
-		flowStatus[internal.ErrorKey] = internal.ErrorNoKeys
-		flowStatus[FreeSlots] = 0
+	if mkf.insertedKeycard.InstanceUID == "" && mkf.insertedKeycard.KeyUID == "" {
+		flowStatus[internal.ErrorKey] = internal.ErrorRequireInit
+		flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
 		mkf.state = Paused
-		signal.Send(finalType, flowStatus)
+		signal.Send(EnterNewPIN, flowStatus)
+		return
+	}
+
+	if mkf.insertedKeycard.FreePairingSlots == 0 {
+		flowStatus[internal.ErrorKey] = FreeSlots
+		flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
+		mkf.state = Paused
+		signal.Send(SwapCard, flowStatus)
 		return
 	}
 
@@ -37,6 +43,7 @@ func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
 		enteredPIN    string
 		enteredNewPIN string
 		enteredPUK    string
+		overwrite     bool
 	)
 
 	if v, ok := mkf.params[PIN]; ok {
@@ -48,8 +55,11 @@ func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
 	if v, ok := mkf.params[PUK]; ok {
 		enteredPUK = v.(string)
 	}
+	if v, ok := mkf.params[Overwrite]; ok {
+		overwrite = v.(bool)
+	}
 
-	finalType = EnterPIN
+	finalType := EnterPIN
 	if mkf.insertedKeycard.PukRetries == 0 {
 		flowStatus[internal.ErrorKey] = PUKRetries
 		finalType = SwapCard
@@ -88,23 +98,24 @@ func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
 		}
 	}
 
-	if mkf.insertedKeycard.PinRetries > 0 && len(enteredPIN) == defPINLen && enteredPIN == mkf.insertedKeycard.Pin ||
-		mkf.insertedKeycard.PinRetries == 0 && mkf.insertedKeycard.PukRetries > 0 && len(enteredPUK) == defPUKLen &&
-			enteredPUK == mkf.insertedKeycard.Puk && len(enteredPIN) == defPINLen && enteredPIN == enteredNewPIN {
-
-		mkf.insertedKeycard.PinRetries = maxPINRetries
-		mkf.insertedKeycard.PukRetries = maxPUKRetries
-		mkf.insertedKeycard.Pin = enteredPIN
-		flowStatus[internal.ErrorKey] = ""
-		flowStatus[MasterKey] = mkf.insertedKeycardHelper.ExportedKey[masterPath]
-		flowStatus[WalleRootKey] = mkf.insertedKeycardHelper.ExportedKey[walletRoothPath]
-		flowStatus[WalletKey] = mkf.insertedKeycardHelper.ExportedKey[walletPath]
-		flowStatus[EIP1581Key] = mkf.insertedKeycardHelper.ExportedKey[eip1581Path]
-		flowStatus[WhisperKey] = mkf.insertedKeycardHelper.ExportedKey[whisperPath]
-		flowStatus[EncKey] = mkf.insertedKeycardHelper.ExportedKey[encryptionPath]
-		mkf.state = Idle
-		signal.Send(FlowResult, flowStatus)
-		return
+	if len(enteredNewPIN) == 0 {
+		if mkf.insertedKeycard.PinRetries > 0 && len(enteredPIN) == defPINLen && enteredPIN == mkf.insertedKeycard.Pin {
+			mkf.insertedKeycard.PinRetries = maxPINRetries
+			mkf.insertedKeycard.PukRetries = maxPUKRetries
+			mkf.insertedKeycard.Pin = enteredPIN
+			flowStatus[internal.ErrorKey] = internal.ErrorChanging
+			finalType = EnterNewPIN
+		}
+	} else {
+		if overwrite && len(enteredPIN) == defPINLen && enteredPIN == enteredNewPIN ||
+			mkf.insertedKeycard.PinRetries == 0 && mkf.insertedKeycard.PukRetries > 0 && len(enteredPUK) == defPUKLen &&
+				enteredPUK == mkf.insertedKeycard.Puk && len(enteredPIN) == defPINLen && enteredPIN == enteredNewPIN {
+			mkf.insertedKeycard.PinRetries = maxPINRetries
+			mkf.insertedKeycard.PukRetries = maxPUKRetries
+			mkf.insertedKeycard.Pin = enteredPIN
+			signal.Send(FlowResult, flowStatus)
+			return
+		}
 	}
 
 	flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots

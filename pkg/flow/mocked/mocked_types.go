@@ -1,6 +1,8 @@
-package statuskeycardgo
+package flow
 
-import "github.com/status-im/status-keycard-go/internal"
+import (
+	"github.com/status-im/status-keycard-go/internal"
+)
 
 type MockedReaderState int
 

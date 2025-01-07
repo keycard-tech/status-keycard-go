@@ -1,4 +1,4 @@
-package statuskeycardgo
+package flow
 
 import (
 	"github.com/status-im/status-keycard-go/signal"

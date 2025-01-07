@@ -1,4 +1,4 @@
-package statuskeycardgo
+package flow
 
 import (
 	"math/rand"
