@@ -1,4 +1,4 @@
-package flow
+package mocked
 
 import (
 	"strconv"
@@ -6,25 +6,26 @@ import (
 
 	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
+	"github.com/status-im/status-keycard-go/pkg/flow"
 )
 
 func (mkf *MockedKeycardFlow) handleStoreMetadataFlow() {
-	flowStatus := FlowStatus{}
+	flowStatus := flow.FlowStatus{}
 
 	if mkf.insertedKeycard.NotStatusKeycard {
 		flowStatus[internal.ErrorKey] = internal.ErrorNotAKeycard
-		flowStatus[InstanceUID] = ""
-		flowStatus[KeyUID] = ""
-		flowStatus[FreeSlots] = 0
-		mkf.state = Paused
-		signal.Send(SwapCard, flowStatus)
+		flowStatus[flow.InstanceUID] = ""
+		flowStatus[flow.KeyUID] = ""
+		flowStatus[flow.FreeSlots] = 0
+		mkf.state = flow.Paused
+		signal.Send(flow.SwapCard, flowStatus)
 		return
 	}
 
-	finalType := FlowResult
-	flowStatus = FlowStatus{
-		InstanceUID: mkf.insertedKeycard.InstanceUID,
-		KeyUID:      mkf.insertedKeycard.KeyUID,
+	finalType := flow.FlowResult
+	flowStatus = flow.FlowStatus{
+		flow.InstanceUID: mkf.insertedKeycard.InstanceUID,
+		flow.KeyUID:      mkf.insertedKeycard.KeyUID,
 	}
 
 	var (
@@ -32,23 +33,23 @@ func (mkf *MockedKeycardFlow) handleStoreMetadataFlow() {
 		enteredCardName string
 	)
 
-	if v, ok := mkf.params[PIN]; ok {
+	if v, ok := mkf.params[flow.PIN]; ok {
 		enteredPIN = v.(string)
 	}
-	if v, ok := mkf.params[CardName]; ok {
+	if v, ok := mkf.params[flow.CardName]; ok {
 		enteredCardName = v.(string)
 	}
 
-	if len(enteredPIN) == defPINLen && enteredPIN == mkf.insertedKeycard.Pin && enteredCardName != "" {
+	if len(enteredPIN) == flow.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin && enteredCardName != "" {
 		mkf.insertedKeycard.Metadata.Name = enteredCardName
 		mkf.insertedKeycard.Metadata.Wallets = []internal.Wallet{}
 
-		if v, ok := mkf.params[WalletPaths]; ok {
+		if v, ok := mkf.params[flow.WalletPaths]; ok {
 			wallets := v.([]interface{})
 
 			for i, p := range wallets {
-				if !strings.HasPrefix(p.(string), walletRoothPath) {
-					panic("path must start with " + walletRoothPath)
+				if !strings.HasPrefix(p.(string), flow.WalletRoothPath) {
+					panic("path must start with " + flow.WalletRoothPath)
 				}
 
 				tmpWallet := internal.Wallet{
@@ -75,21 +76,21 @@ func (mkf *MockedKeycardFlow) handleStoreMetadataFlow() {
 			}
 		}
 
-		mkf.state = Idle
+		mkf.state = flow.Idle
 		signal.Send(finalType, flowStatus)
 
 		return
 	}
 
-	if len(enteredPIN) != defPINLen || enteredPIN != mkf.insertedKeycard.Pin {
-		finalType = EnterPIN
+	if len(enteredPIN) != flow.DefPINLen || enteredPIN != mkf.insertedKeycard.Pin {
+		finalType = flow.EnterPIN
 	} else if enteredCardName == "" {
-		finalType = EnterName
+		finalType = flow.EnterName
 	}
 
-	flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
-	flowStatus[PINRetries] = mkf.insertedKeycard.PinRetries
-	flowStatus[PUKRetries] = mkf.insertedKeycard.PukRetries
-	mkf.state = Paused
+	flowStatus[flow.FreeSlots] = mkf.insertedKeycard.FreePairingSlots
+	flowStatus[flow.PINRetries] = mkf.insertedKeycard.PinRetries
+	flowStatus[flow.PUKRetries] = mkf.insertedKeycard.PukRetries
+	mkf.state = flow.Paused
 	signal.Send(finalType, flowStatus)
 }

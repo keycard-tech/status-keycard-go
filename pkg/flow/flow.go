@@ -1,4 +1,4 @@
-package statuskeycardgo
+package flow
 
 import (
 	"errors"
@@ -19,7 +19,7 @@ type cardStatus struct {
 
 type KeycardFlow struct {
 	flowType FlowType
-	state    runState
+	state    RunState
 	wakeUp   chan (struct{})
 	pairings *pairing.Store
 	params   FlowParams
@@ -307,38 +307,38 @@ func (f *KeycardFlow) exportKeysFlow(kc *internal.KeycardContext, recover bool) 
 
 	result := FlowStatus{KeyUID: f.cardInfo.keyUID, InstanceUID: f.cardInfo.instanceUID}
 
-	key, err := f.exportKey(kc, encryptionPath, false)
+	key, err := f.exportKey(kc, EncryptionPath, false)
 	if err != nil {
 		return nil, err
 	}
 	result[EncKey] = key
 
-	key, err = f.exportKey(kc, whisperPath, false)
+	key, err = f.exportKey(kc, WhisperPath, false)
 	if err != nil {
 		return nil, err
 	}
 	result[WhisperKey] = key
 
 	if recover {
-		key, err = f.exportKey(kc, eip1581Path, true)
+		key, err = f.exportKey(kc, Eip1581Path, true)
 		if err != nil {
 			return nil, err
 		}
 		result[EIP1581Key] = key
 
-		key, err = f.exportKey(kc, walletRoothPath, true)
+		key, err = f.exportKey(kc, WalletRoothPath, true)
 		if err != nil {
 			return nil, err
 		}
 		result[WalleRootKey] = key
 
-		key, err = f.exportKey(kc, walletPath, true)
+		key, err = f.exportKey(kc, WalletPath, true)
 		if err != nil {
 			return nil, err
 		}
 		result[WalletKey] = key
 
-		key, err = f.exportKey(kc, masterPath, true)
+		key, err = f.exportKey(kc, MasterPath, true)
 		if err != nil {
 			return nil, err
 		}
@@ -364,7 +364,7 @@ func (f *KeycardFlow) exportPublicFlow(kc *internal.KeycardContext) (FlowStatus,
 	result := FlowStatus{KeyUID: f.cardInfo.keyUID, InstanceUID: f.cardInfo.instanceUID}
 
 	if exportMaster, ok := f.params[ExportMaster]; ok && exportMaster.(bool) {
-		masterKey, err := f.exportKey(kc, masterPath, true)
+		masterKey, err := f.exportKey(kc, MasterPath, true)
 		result[MasterAddr] = masterKey.Address
 
 		if err != nil {
@@ -499,7 +499,7 @@ func (f *KeycardFlow) unpairOthersFlow(kc *internal.KeycardContext) (FlowStatus,
 		return nil, err
 	}
 
-	for i := 0; i < maxFreeSlots; i++ {
+	for i := 0; i < MaxFreeSlots; i++ {
 		if i == kc.PairingInfo().Index {
 			continue
 		}
@@ -578,7 +578,7 @@ func (f *KeycardFlow) getMetadataFlow(kc *internal.KeycardContext) (FlowStatus, 
 		}
 
 		if exportMaster, ok := f.params[ExportMaster]; ok && exportMaster.(bool) {
-			masterKey, err := f.exportKey(kc, masterPath, true)
+			masterKey, err := f.exportKey(kc, MasterPath, true)
 			result[MasterAddr] = masterKey.Address
 
 			if err != nil {

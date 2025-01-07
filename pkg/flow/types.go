@@ -1,9 +1,9 @@
-package statuskeycardgo
+package flow
 
 type FlowType int
 type FlowParams map[string]interface{}
 type FlowStatus map[string]interface{}
-type runState int
+type RunState int
 
 type restartError struct{}
 type giveupError struct{}
@@ -42,7 +42,7 @@ const (
 )
 
 const (
-	Idle runState = iota
+	Idle RunState = iota
 	Running
 	Paused
 	Resuming
@@ -107,19 +107,19 @@ const (
 )
 
 const (
-	maxPINRetries = 3
-	maxPUKRetries = 5
-	maxFreeSlots  = 5
-	defMnemoLen   = 12
-	defPINLen     = 6
-	defPUKLen     = 12
+	MaxPINRetries = 3
+	MaxPUKRetries = 5
+	MaxFreeSlots  = 5
+	DefMnemoLen   = 12
+	DefPINLen     = 6
+	DefPUKLen     = 12
 )
 
 const (
-	masterPath      = "m"
-	walletRoothPath = "m/44'/60'/0'/0"
-	walletPath      = walletRoothPath + "/0"
-	eip1581Path     = "m/43'/60'/1581'"
-	whisperPath     = eip1581Path + "/0'/0"
-	encryptionPath  = eip1581Path + "/1'/0"
+	MasterPath      = "m"
+	WalletRoothPath = "m/44'/60'/0'/0"
+	WalletPath      = WalletRoothPath + "/0"
+	Eip1581Path     = "m/43'/60'/1581'"
+	WhisperPath     = Eip1581Path + "/0'/0"
+	EncryptionPath  = Eip1581Path + "/1'/0"
 )

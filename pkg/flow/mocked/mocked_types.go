@@ -1,7 +1,8 @@
-package flow
+package mocked
 
 import (
 	"github.com/status-im/status-keycard-go/internal"
+	"github.com/status-im/status-keycard-go/pkg/flow"
 )
 
 type MockedReaderState int
@@ -42,9 +43,9 @@ type MockedKeycard struct {
 var mockedKeycard = MockedKeycard{
 	InstanceUID:      "00000000000000000000001234567890",
 	KeyUID:           "0000000000000000000000000000000000000000000000000000001234567890",
-	FreePairingSlots: maxFreeSlots - 1,
-	PinRetries:       maxPINRetries,
-	PukRetries:       maxPUKRetries,
+	FreePairingSlots: flow.MaxFreeSlots - 1,
+	PinRetries:       flow.MaxPINRetries,
+	PukRetries:       flow.MaxPUKRetries,
 	Pin:              "111111",
 	Puk:              "111111111111",
 	PairingInfo: &internal.PairingInfo{
@@ -71,9 +72,9 @@ var mockedKeycard = MockedKeycard{
 var mockedKeycardHelper = MockedKeycard{
 	InstanceUID:      "00000000000000000000001234567890",
 	KeyUID:           "0000000000000000000000000000000000000000000000000000001234567890",
-	FreePairingSlots: maxFreeSlots - 1,
-	PinRetries:       maxPINRetries,
-	PukRetries:       maxPUKRetries,
+	FreePairingSlots: flow.MaxFreeSlots - 1,
+	PinRetries:       flow.MaxPINRetries,
+	PukRetries:       flow.MaxPUKRetries,
 	Pin:              "111111",
 	Puk:              "111111111111",
 	PairingInfo: &internal.PairingInfo{

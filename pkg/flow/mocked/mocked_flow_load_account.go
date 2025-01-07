@@ -1,4 +1,4 @@
-package flow
+package mocked
 
 import (
 	"math/rand"
@@ -6,25 +6,26 @@ import (
 
 	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
+	"github.com/status-im/status-keycard-go/pkg/flow"
 )
 
 func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
-	flowStatus := FlowStatus{}
+	flowStatus := flow.FlowStatus{}
 
 	if mkf.insertedKeycard.NotStatusKeycard {
 		flowStatus[internal.ErrorKey] = internal.ErrorNotAKeycard
-		flowStatus[InstanceUID] = ""
-		flowStatus[KeyUID] = ""
-		flowStatus[FreeSlots] = 0
-		mkf.state = Paused
-		signal.Send(SwapCard, flowStatus)
+		flowStatus[flow.InstanceUID] = ""
+		flowStatus[flow.KeyUID] = ""
+		flowStatus[flow.FreeSlots] = 0
+		mkf.state = flow.Paused
+		signal.Send(flow.SwapCard, flowStatus)
 		return
 	}
 
-	finalType := SwapCard
-	flowStatus = FlowStatus{
-		InstanceUID: mkf.insertedKeycard.InstanceUID,
-		KeyUID:      mkf.insertedKeycard.KeyUID,
+	finalType := flow.SwapCard
+	flowStatus = flow.FlowStatus{
+		flow.InstanceUID: mkf.insertedKeycard.InstanceUID,
+		flow.KeyUID:      mkf.insertedKeycard.KeyUID,
 	}
 
 	var (
@@ -37,34 +38,34 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 		enteredNewPIN         string
 	)
 
-	if v, ok := mkf.params[FactoryReset]; ok {
+	if v, ok := mkf.params[flow.FactoryReset]; ok {
 		factoryReset = v.(bool)
 	}
-	if v, ok := mkf.params[Overwrite]; ok {
+	if v, ok := mkf.params[flow.Overwrite]; ok {
 		overwrite = v.(bool)
 	}
-	if v, ok := mkf.params[MnemonicLen]; ok {
+	if v, ok := mkf.params[flow.MnemonicLen]; ok {
 		switch t := v.(type) {
 		case int:
 			enteredMnemonicLength = t
 		case float64:
 			enteredMnemonicLength = int(t)
 		default:
-			enteredMnemonicLength = defMnemoLen
+			enteredMnemonicLength = flow.DefMnemoLen
 		}
 	} else {
-		enteredMnemonicLength = defMnemoLen
+		enteredMnemonicLength = flow.DefMnemoLen
 	}
-	if v, ok := mkf.params[Mnemonic]; ok {
+	if v, ok := mkf.params[flow.Mnemonic]; ok {
 		enteredMnemonic = v.(string)
 	}
-	if v, ok := mkf.params[NewPUK]; ok {
+	if v, ok := mkf.params[flow.NewPUK]; ok {
 		enteredNewPUK = v.(string)
 	}
-	if v, ok := mkf.params[PIN]; ok {
+	if v, ok := mkf.params[flow.PIN]; ok {
 		enteredPIN = v.(string)
 	}
-	if v, ok := mkf.params[NewPIN]; ok {
+	if v, ok := mkf.params[flow.NewPIN]; ok {
 		enteredNewPIN = v.(string)
 	}
 
@@ -74,13 +75,13 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 
 	if mkf.insertedKeycard.InstanceUID != "" && mkf.insertedKeycard.KeyUID != "" {
 		flowStatus[internal.ErrorKey] = internal.ErrorHasKeys
-		flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
-		mkf.state = Paused
+		flowStatus[flow.FreeSlots] = mkf.insertedKeycard.FreePairingSlots
+		mkf.state = flow.Paused
 		signal.Send(finalType, flowStatus)
 		return
 	}
 
-	if len(enteredPIN) == defPINLen && enteredPIN == enteredNewPIN && len(enteredNewPUK) == defPUKLen {
+	if len(enteredPIN) == flow.DefPINLen && enteredPIN == enteredNewPIN && len(enteredNewPUK) == flow.DefPUKLen {
 		if overwrite && enteredMnemonic == "" {
 
 			if mkf.insertedKeycard.InstanceUID == "" {
@@ -95,14 +96,14 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 				indexes = append(indexes, rand.Intn(2048))
 			}
 
-			finalType = EnterMnemonic
+			finalType = flow.EnterMnemonic
 			flowStatus[internal.ErrorKey] = internal.ErrorLoading
-			flowStatus[MnemonicIdxs] = indexes
-			flowStatus[InstanceUID] = mkf.insertedKeycard.InstanceUID
-			flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
-			flowStatus[PINRetries] = mkf.insertedKeycard.PinRetries
-			flowStatus[PUKRetries] = mkf.insertedKeycard.PukRetries
-			mkf.state = Paused
+			flowStatus[flow.MnemonicIdxs] = indexes
+			flowStatus[flow.InstanceUID] = mkf.insertedKeycard.InstanceUID
+			flowStatus[flow.FreeSlots] = mkf.insertedKeycard.FreePairingSlots
+			flowStatus[flow.PINRetries] = mkf.insertedKeycard.PinRetries
+			flowStatus[flow.PUKRetries] = mkf.insertedKeycard.PukRetries
+			mkf.state = flow.Paused
 			signal.Send(finalType, flowStatus)
 			return
 		} else {
@@ -113,24 +114,24 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 				mkf.insertedKeycard.KeyUID = mkf.insertedKeycardHelper.KeyUID
 				mkf.insertedKeycard.Pin = enteredPIN
 				mkf.insertedKeycard.Puk = enteredNewPUK
-				mkf.insertedKeycard.PinRetries = maxPINRetries
-				mkf.insertedKeycard.PukRetries = maxPUKRetries
-				mkf.insertedKeycard.FreePairingSlots = maxFreeSlots - 1
+				mkf.insertedKeycard.PinRetries = flow.MaxPINRetries
+				mkf.insertedKeycard.PukRetries = flow.MaxPUKRetries
+				mkf.insertedKeycard.FreePairingSlots = flow.MaxFreeSlots - 1
 
 				mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
 
-				finalType = FlowResult
-				flowStatus[InstanceUID] = mkf.insertedKeycard.InstanceUID
-				flowStatus[KeyUID] = mkf.insertedKeycard.KeyUID
-				mkf.state = Idle
+				finalType = flow.FlowResult
+				flowStatus[flow.InstanceUID] = mkf.insertedKeycard.InstanceUID
+				flowStatus[flow.KeyUID] = mkf.insertedKeycard.KeyUID
+				mkf.state = flow.Idle
 				signal.Send(finalType, flowStatus)
 				return
 			}
 		}
 	}
 
-	finalType = EnterNewPIN
+	finalType = flow.EnterNewPIN
 	flowStatus[internal.ErrorKey] = internal.ErrorRequireInit
-	mkf.state = Paused
+	mkf.state = flow.Paused
 	signal.Send(finalType, flowStatus)
 }

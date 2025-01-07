@@ -1,33 +1,34 @@
-package flow
+package mocked
 
 import (
 	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
+	"github.com/status-im/status-keycard-go/pkg/flow"
 )
 
 func (mkf *MockedKeycardFlow) handleGetAppInfoFlow() {
-	flowStatus := FlowStatus{}
+	flowStatus := flow.FlowStatus{}
 
 	if mkf.insertedKeycard.NotStatusKeycard {
 		flowStatus[internal.ErrorKey] = internal.ErrorNotAKeycard
-		flowStatus[InstanceUID] = ""
-		flowStatus[KeyUID] = ""
-		flowStatus[FreeSlots] = 0
-		mkf.state = Paused
-		signal.Send(SwapCard, flowStatus)
+		flowStatus[flow.InstanceUID] = ""
+		flowStatus[flow.KeyUID] = ""
+		flowStatus[flow.FreeSlots] = 0
+		mkf.state = flow.Paused
+		signal.Send(flow.SwapCard, flowStatus)
 		return
 	}
 
-	flowStatus = FlowStatus{
-		PINRetries: mkf.insertedKeycard.PinRetries,
-		PUKRetries: mkf.insertedKeycard.PukRetries,
+	flowStatus = flow.FlowStatus{
+		flow.PINRetries: mkf.insertedKeycard.PinRetries,
+		flow.PUKRetries: mkf.insertedKeycard.PukRetries,
 	}
 
 	if mkf.insertedKeycard.InstanceUID == "" || mkf.insertedKeycard.KeyUID == "" {
 		flowStatus[internal.ErrorKey] = internal.ErrorNoKeys
-		flowStatus[FreeSlots] = 0
-		mkf.state = Paused
-		signal.Send(SwapCard, flowStatus)
+		flowStatus[flow.FreeSlots] = 0
+		mkf.state = flow.Paused
+		signal.Send(flow.SwapCard, flowStatus)
 		return
 	}
 
@@ -36,21 +37,21 @@ func (mkf *MockedKeycardFlow) handleGetAppInfoFlow() {
 		factoryReset bool
 	)
 
-	if v, ok := mkf.params[PIN]; ok {
+	if v, ok := mkf.params[flow.PIN]; ok {
 		enteredPIN = v.(string)
 	}
 
-	if v, ok := mkf.params[FactoryReset]; ok {
+	if v, ok := mkf.params[flow.FactoryReset]; ok {
 		factoryReset = v.(bool)
 	}
 
 	if factoryReset {
-		mkf.state = Idle
+		mkf.state = flow.Idle
 		*mkf.insertedKeycard = MockedKeycard{}
-		signal.Send(FlowResult, FlowStatus{
+		signal.Send(flow.FlowResult, flow.FlowStatus{
 			internal.ErrorKey: internal.ErrorOK,
-			Paired:            false,
-			AppInfo: internal.ApplicationInfo{
+			flow.Paired:       false,
+			flow.AppInfo: internal.ApplicationInfo{
 				Initialized:    false,
 				InstanceUID:    []byte(""),
 				Version:        0,
@@ -62,24 +63,24 @@ func (mkf *MockedKeycardFlow) handleGetAppInfoFlow() {
 	}
 
 	keycardStoresKeys := mkf.insertedKeycard.InstanceUID != "" && mkf.insertedKeycard.KeyUID != ""
-	if len(enteredPIN) == defPINLen && enteredPIN == mkf.insertedKeycard.Pin || !keycardStoresKeys {
+	if len(enteredPIN) == flow.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin || !keycardStoresKeys {
 		flowStatus[internal.ErrorKey] = internal.ErrorOK
-		flowStatus[Paired] = keycardStoresKeys
-		flowStatus[AppInfo] = internal.ApplicationInfo{
+		flowStatus[flow.Paired] = keycardStoresKeys
+		flowStatus[flow.AppInfo] = internal.ApplicationInfo{
 			Initialized:    keycardStoresKeys,
 			InstanceUID:    internal.HexString(mkf.insertedKeycard.InstanceUID),
 			Version:        123,
 			AvailableSlots: mkf.insertedKeycard.FreePairingSlots,
 			KeyUID:         internal.HexString(mkf.insertedKeycard.KeyUID),
 		}
-		mkf.state = Idle
-		signal.Send(FlowResult, flowStatus)
+		mkf.state = flow.Idle
+		signal.Send(flow.FlowResult, flowStatus)
 		return
 	}
 
-	flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
-	flowStatus[InstanceUID] = mkf.insertedKeycard.InstanceUID
-	flowStatus[KeyUID] = mkf.insertedKeycard.KeyUID
-	mkf.state = Paused
-	signal.Send(EnterPIN, flowStatus)
+	flowStatus[flow.FreeSlots] = mkf.insertedKeycard.FreePairingSlots
+	flowStatus[flow.InstanceUID] = mkf.insertedKeycard.InstanceUID
+	flowStatus[flow.KeyUID] = mkf.insertedKeycard.KeyUID
+	mkf.state = flow.Paused
+	signal.Send(flow.EnterPIN, flowStatus)
 }

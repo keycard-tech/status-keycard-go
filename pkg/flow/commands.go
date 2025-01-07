@@ -1,4 +1,4 @@
-package statuskeycardgo
+package flow
 
 import (
 	"errors"
@@ -187,8 +187,8 @@ func (f *KeycardFlow) unblockPIN(kc *internal.KeycardContext) error {
 		err = kc.UnblockPIN(puk.(string), newPIN.(string))
 
 		if err == nil {
-			f.cardInfo.pinRetries = maxPINRetries
-			f.cardInfo.pukRetries = maxPUKRetries
+			f.cardInfo.pinRetries = MaxPINRetries
+			f.cardInfo.pukRetries = MaxPUKRetries
 			f.params[PIN] = newPIN
 			delete(f.params, NewPIN)
 			delete(f.params, PUK)
@@ -233,7 +233,7 @@ func (f *KeycardFlow) authenticate(kc *internal.KeycardContext) error {
 		err := kc.VerifyPin(pin.(string))
 
 		if err == nil {
-			f.cardInfo.pinRetries = maxPINRetries
+			f.cardInfo.pinRetries = MaxPINRetries
 			return nil
 		} else if internal.IsSCardError(err) {
 			return restartErr()
@@ -345,8 +345,8 @@ func (f *KeycardFlow) storeMetadata(kc *internal.KeycardContext) error {
 
 	paths := make([]uint32, len(wallets))
 	for i, p := range wallets {
-		if !strings.HasPrefix(p.(string), walletRoothPath) {
-			return errors.New("path must start with " + walletRoothPath)
+		if !strings.HasPrefix(p.(string), WalletRoothPath) {
+			return errors.New("path must start with " + WalletRoothPath)
 		}
 
 		_, components, err := derivationpath.Decode(p.(string))
@@ -372,7 +372,7 @@ func (f *KeycardFlow) storeMetadata(kc *internal.KeycardContext) error {
 }
 
 func (f *KeycardFlow) exportKey(kc *internal.KeycardContext, path string, onlyPublic bool) (*internal.KeyPair, error) {
-	keyPair, err := kc.ExportKey(true, path == masterPath, onlyPublic, path)
+	keyPair, err := kc.ExportKey(true, path == MasterPath, onlyPublic, path)
 
 	if internal.IsSCardError(err) {
 		return nil, restartErr()
@@ -439,10 +439,10 @@ func (f *KeycardFlow) loadKeys(kc *internal.KeycardContext) error {
 		case float64:
 			mnemonicLength = int(t)
 		default:
-			mnemonicLength = defMnemoLen
+			mnemonicLength = DefMnemoLen
 		}
 	} else {
-		mnemonicLength = defMnemoLen
+		mnemonicLength = DefMnemoLen
 	}
 
 	indexes, err := kc.GenerateMnemonic(mnemonicLength / 3)
