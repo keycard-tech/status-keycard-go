@@ -2,63 +2,64 @@ package statuskeycardgo
 
 import (
 	"encoding/json"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
-type hexString []byte
+type HexString []byte
 
-// MarshalJSON serializes hexString to hex
-func (s hexString) MarshalJSON() ([]byte, error) {
-	bytes, err := json.Marshal(btox(s))
+// MarshalJSON serializes HexString to hex
+func (s HexString) MarshalJSON() ([]byte, error) {
+	bytes, err := json.Marshal(internal.Btox(s))
 	return bytes, err
 }
 
-// UnmarshalJSON deserializes hexString to hex
-func (s *hexString) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON deserializes HexString to hex
+func (s *HexString) UnmarshalJSON(data []byte) error {
 	var x string
 	err := json.Unmarshal(data, &x)
 	if err != nil {
 		return err
 	}
-	str, err := xtob(x)
+	str, err := internal.Xtob(x)
 	if err != nil {
 		return err
 	}
 
-	*s = hexString([]byte(str))
+	*s = HexString([]byte(str))
 	return nil
 }
 
 type Signature struct {
-	R hexString `json:"r"`
-	S hexString `json:"s"`
+	R HexString `json:"r"`
+	S HexString `json:"s"`
 	V byte      `json:"v"`
 }
 
 type ApplicationInfo struct {
 	Initialized    bool      `json:"initialized"`
-	InstanceUID    hexString `json:"instanceUID"`
+	InstanceUID    HexString `json:"instanceUID"`
 	Version        int       `json:"version"`
 	AvailableSlots int       `json:"availableSlots"`
-	// KeyUID is the sha256 of of the master public key on the card.
+	// KeyUID is the sha256 of the master public key on the card.
 	// It's empty if the card doesn't contain any key.
-	KeyUID hexString `json:"keyUID"`
+	KeyUID HexString `json:"keyUID"`
 }
 
 type PairingInfo struct {
-	Key   hexString `json:"key"`
+	Key   HexString `json:"key"`
 	Index int       `json:"index"`
 }
 
 type KeyPair struct {
 	Address    string    `json:"address"`
-	PublicKey  hexString `json:"publicKey"`
-	PrivateKey hexString `json:"privateKey,omitempty"`
+	PublicKey  HexString `json:"publicKey"`
+	PrivateKey HexString `json:"privateKey,omitempty"`
 }
 
 type Wallet struct {
 	Path      string    `json:"path"`
 	Address   string    `json:"address,omitempty"`
-	PublicKey hexString `json:"publicKey"`
+	PublicKey HexString `json:"publicKey"`
 }
 
 type Metadata struct {
