@@ -179,14 +179,14 @@ func (f *KeycardFlow) requireNoKeys() error {
 	return f.pauseAndRestart(SwapCard, internal.ErrorHasKeys)
 }
 
-func (f *KeycardFlow) closeKeycard(kc *keycardContext) {
+func (f *KeycardFlow) closeKeycard(kc *internal.KeycardContext) {
 	if kc != nil {
-		kc.stop()
+		kc.Stop()
 	}
 }
 
-func (f *KeycardFlow) connect() (*keycardContext, error) {
-	kc, err := startKeycardContext()
+func (f *KeycardFlow) connect() (*internal.KeycardContext, error) {
+	kc, err := internal.StartKeycardContext()
 
 	if err != nil {
 		return nil, err
@@ -201,8 +201,8 @@ func (f *KeycardFlow) connect() (*keycardContext, error) {
 				panic("Resuming is not expected during connection")
 			}
 			return nil, giveupErr()
-		case <-kc.connected:
-			if kc.runErr != nil {
+		case <-kc.Connected():
+			if kc.RunErr() != nil {
 				return nil, restartErr()
 			}
 			t.Stop()
@@ -274,8 +274,8 @@ func (f *KeycardFlow) connectedFlow() (FlowStatus, error) {
 	}
 }
 
-func (f *KeycardFlow) getAppInfoFlow(kc *keycardContext) (FlowStatus, error) {
-	res := FlowStatus{internal.ErrorKey: internal.ErrorOK, AppInfo: internal.ToAppInfo(kc.cmdSet.ApplicationInfo)}
+func (f *KeycardFlow) getAppInfoFlow(kc *internal.KeycardContext) (FlowStatus, error) {
+	res := FlowStatus{internal.ErrorKey: internal.ErrorOK, AppInfo: internal.ToAppInfo(kc.ApplicationInfo())}
 	err := f.openSCAndAuthenticate(kc, true)
 
 	if err == nil {
@@ -291,7 +291,7 @@ func (f *KeycardFlow) getAppInfoFlow(kc *keycardContext) (FlowStatus, error) {
 	return res, nil
 }
 
-func (f *KeycardFlow) exportKeysFlow(kc *keycardContext, recover bool) (FlowStatus, error) {
+func (f *KeycardFlow) exportKeysFlow(kc *internal.KeycardContext, recover bool) (FlowStatus, error) {
 	err := f.requireKeys()
 
 	if err != nil {
@@ -347,7 +347,7 @@ func (f *KeycardFlow) exportKeysFlow(kc *keycardContext, recover bool) (FlowStat
 	return result, nil
 }
 
-func (f *KeycardFlow) exportPublicFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) exportPublicFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.requireKeys()
 
 	if err != nil {
@@ -382,7 +382,7 @@ func (f *KeycardFlow) exportPublicFlow(kc *keycardContext) (FlowStatus, error) {
 	return result, nil
 }
 
-func (f *KeycardFlow) loadKeysFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) loadKeysFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.requireNoKeys()
 
 	if err != nil {
@@ -404,7 +404,7 @@ func (f *KeycardFlow) loadKeysFlow(kc *keycardContext) (FlowStatus, error) {
 	return FlowStatus{KeyUID: f.cardInfo.keyUID, InstanceUID: f.cardInfo.instanceUID}, nil
 }
 
-func (f *KeycardFlow) signFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) signFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.requireKeys()
 
 	if err != nil {
@@ -426,7 +426,7 @@ func (f *KeycardFlow) signFlow(kc *keycardContext) (FlowStatus, error) {
 	return FlowStatus{KeyUID: f.cardInfo.keyUID, InstanceUID: f.cardInfo.instanceUID, TXSignature: signature}, nil
 }
 
-func (f *KeycardFlow) changePINFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) changePINFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.openSCAndAuthenticate(kc, false)
 
 	if err != nil {
@@ -442,7 +442,7 @@ func (f *KeycardFlow) changePINFlow(kc *keycardContext) (FlowStatus, error) {
 	return FlowStatus{InstanceUID: f.cardInfo.instanceUID, KeyUID: f.cardInfo.keyUID}, nil
 }
 
-func (f *KeycardFlow) changePUKFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) changePUKFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.openSCAndAuthenticate(kc, false)
 
 	if err != nil {
@@ -458,7 +458,7 @@ func (f *KeycardFlow) changePUKFlow(kc *keycardContext) (FlowStatus, error) {
 	return FlowStatus{InstanceUID: f.cardInfo.instanceUID, KeyUID: f.cardInfo.keyUID}, nil
 }
 
-func (f *KeycardFlow) changePairingFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) changePairingFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.openSCAndAuthenticate(kc, false)
 
 	if err != nil {
@@ -474,7 +474,7 @@ func (f *KeycardFlow) changePairingFlow(kc *keycardContext) (FlowStatus, error) 
 	return FlowStatus{InstanceUID: f.cardInfo.instanceUID, KeyUID: f.cardInfo.keyUID}, nil
 }
 
-func (f *KeycardFlow) unpairThisFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) unpairThisFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.openSCAndAuthenticate(kc, true)
 
 	if err != nil {
@@ -491,7 +491,7 @@ func (f *KeycardFlow) unpairThisFlow(kc *keycardContext) (FlowStatus, error) {
 	return FlowStatus{InstanceUID: f.cardInfo.instanceUID, KeyUID: f.cardInfo.keyUID, FreeSlots: f.cardInfo.freeSlots}, nil
 }
 
-func (f *KeycardFlow) unpairOthersFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) unpairOthersFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.openSCAndAuthenticate(kc, true)
 
 	if err != nil {
@@ -499,7 +499,7 @@ func (f *KeycardFlow) unpairOthersFlow(kc *keycardContext) (FlowStatus, error) {
 	}
 
 	for i := 0; i < maxFreeSlots; i++ {
-		if i == kc.cmdSet.PairingInfo.Index {
+		if i == kc.PairingInfo().Index {
 			continue
 		}
 
@@ -514,7 +514,7 @@ func (f *KeycardFlow) unpairOthersFlow(kc *keycardContext) (FlowStatus, error) {
 	return FlowStatus{InstanceUID: f.cardInfo.instanceUID, KeyUID: f.cardInfo.keyUID, FreeSlots: f.cardInfo.freeSlots}, nil
 }
 
-func (f *KeycardFlow) deleteUnpairFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) deleteUnpairFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.openSCAndAuthenticate(kc, true)
 
 	if err != nil {
@@ -540,7 +540,7 @@ func (f *KeycardFlow) deleteUnpairFlow(kc *keycardContext) (FlowStatus, error) {
 	return FlowStatus{InstanceUID: f.cardInfo.instanceUID, KeyUID: f.cardInfo.keyUID, FreeSlots: f.cardInfo.freeSlots}, nil
 }
 
-func (f *KeycardFlow) storeMetadataFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) storeMetadataFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	err := f.openSCAndAuthenticate(kc, false)
 
 	if err != nil {
@@ -556,7 +556,7 @@ func (f *KeycardFlow) storeMetadataFlow(kc *keycardContext) (FlowStatus, error) 
 	return FlowStatus{InstanceUID: f.cardInfo.instanceUID, KeyUID: f.cardInfo.keyUID}, nil
 }
 
-func (f *KeycardFlow) getMetadataFlow(kc *keycardContext) (FlowStatus, error) {
+func (f *KeycardFlow) getMetadataFlow(kc *internal.KeycardContext) (FlowStatus, error) {
 	m, err := f.getMetadata(kc)
 
 	if err != nil {

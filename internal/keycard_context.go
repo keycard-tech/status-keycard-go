@@ -1,4 +1,4 @@
-package statuskeycardgo
+package internal
 
 import (
 	"crypto/sha512"
@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/keycard-go/types"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/text/unicode/norm"
-	"github.com/status-im/status-keycard-go/internal"
 )
 
 const bip39Salt = "mnemonic"
@@ -77,7 +76,7 @@ func (kc *KeycardContext) run() {
 
 	defer func() {
 		if err != nil {
-			internal.Printf(err.Error())
+			Printf(err.Error())
 		}
 
 		kc.runErr = err
@@ -120,19 +119,19 @@ func (kc *KeycardContext) run() {
 func (kc *KeycardContext) start() error {
 	cardCtx, err := scard.EstablishContext()
 	if err != nil {
-		return errors.New(internal.ErrorPCSC)
+		return errors.New(ErrorPCSC)
 	}
 
-	internal.Printf("listing readers")
+	Printf("listing readers")
 	readers, err := cardCtx.ListReaders()
 	if err != nil {
-		return errors.New(internal.ErrorReaderList)
+		return errors.New(ErrorReaderList)
 	}
 
 	kc.readers = readers
 
 	if len(readers) == 0 {
-		return errors.New(internal.ErrorNoReader)
+		return errors.New(ErrorNoReader)
 	}
 
 	kc.cardCtx = cardCtx
@@ -144,16 +143,16 @@ func (kc *KeycardContext) Stop() {
 }
 
 func (kc *KeycardContext) connect() error {
-	internal.Printf("waiting for card")
+	Printf("waiting for card")
 	index, err := kc.waitForCard(kc.cardCtx, kc.readers)
 	if err != nil {
 		return err
 	}
 
-	internal.Printf("card found at index %d", index)
+	Printf("card found at index %d", index)
 	reader := kc.readers[index]
 
-	internal.Printf("using reader %s", reader)
+	Printf("using reader %s", reader)
 
 	card, err := kc.cardCtx.Connect(reader, scard.ShareShared, scard.ProtocolAny)
 	if err != nil {
@@ -170,11 +169,11 @@ func (kc *KeycardContext) connect() error {
 
 	switch status.ActiveProtocol {
 	case scard.ProtocolT0:
-		internal.Printf("card protocol T0")
+		Printf("card protocol T0")
 	case scard.ProtocolT1:
-		internal.Printf("card protocol T1")
+		Printf("card protocol T1")
 	default:
-		internal.Printf("card protocol T unknown")
+		Printf("card protocol T unknown")
 	}
 
 	kc.card = card
@@ -215,7 +214,7 @@ func (kc *KeycardContext) SelectApplet() (*types.ApplicationInfo, error) {
 			err = nil
 			kc.cmdSet.ApplicationInfo = &types.ApplicationInfo{}
 		} else {
-			internal.Printf("select failed %+v", err)
+			Printf("select failed %+v", err)
 			return nil, err
 		}
 	}
@@ -226,7 +225,7 @@ func (kc *KeycardContext) SelectApplet() (*types.ApplicationInfo, error) {
 func (kc *KeycardContext) Pair(pairingPassword string) (*types.PairingInfo, error) {
 	err := kc.cmdSet.Pair(pairingPassword)
 	if err != nil {
-		internal.Printf("Pair failed %+v", err)
+		Printf("Pair failed %+v", err)
 		return nil, err
 	}
 
@@ -237,7 +236,7 @@ func (kc *KeycardContext) OpenSecureChannel(index int, key []byte) error {
 	kc.cmdSet.SetPairingInfo(key, index)
 	err := kc.cmdSet.OpenSecureChannel()
 	if err != nil {
-		internal.Printf("OpenSecureChannel failed %+v", err)
+		Printf("OpenSecureChannel failed %+v", err)
 		return err
 	}
 
@@ -247,7 +246,7 @@ func (kc *KeycardContext) OpenSecureChannel(index int, key []byte) error {
 func (kc *KeycardContext) VerifyPin(pin string) error {
 	err := kc.cmdSet.VerifyPIN(pin)
 	if err != nil {
-		internal.Printf("VerifyPin failed %+v", err)
+		Printf("VerifyPin failed %+v", err)
 		return err
 	}
 
@@ -257,7 +256,7 @@ func (kc *KeycardContext) VerifyPin(pin string) error {
 func (kc *KeycardContext) UnblockPIN(puk string, newPIN string) error {
 	err := kc.cmdSet.UnblockPIN(puk, newPIN)
 	if err != nil {
-		internal.Printf("UnblockPIN failed %+v", err)
+		Printf("UnblockPIN failed %+v", err)
 		return err
 	}
 
@@ -268,18 +267,18 @@ func (kc *KeycardContext) UnblockPIN(puk string, newPIN string) error {
 func (kc *KeycardContext) GenerateKey() ([]byte, error) {
 	appStatus, err := kc.cmdSet.GetStatusApplication()
 	if err != nil {
-		internal.Printf("getStatus failed %+v", err)
+		Printf("getStatus failed %+v", err)
 		return nil, err
 	}
 
 	if appStatus.KeyInitialized {
-		internal.Printf("generateKey failed - already generated - %+v", err)
+		Printf("generateKey failed - already generated - %+v", err)
 		return nil, errors.New("key already generated")
 	}
 
 	keyUID, err := kc.cmdSet.GenerateKey()
 	if err != nil {
-		internal.Printf("generateKey failed %+v", err)
+		Printf("generateKey failed %+v", err)
 		return nil, err
 	}
 
@@ -289,7 +288,7 @@ func (kc *KeycardContext) GenerateKey() ([]byte, error) {
 func (kc *KeycardContext) GenerateMnemonic(checksumSize int) ([]int, error) {
 	indexes, err := kc.cmdSet.GenerateMnemonic(checksumSize)
 	if err != nil {
-		internal.Printf("generateMnemonic failed %+v", err)
+		Printf("generateMnemonic failed %+v", err)
 		return nil, err
 	}
 
@@ -299,7 +298,7 @@ func (kc *KeycardContext) GenerateMnemonic(checksumSize int) ([]int, error) {
 func (kc *KeycardContext) RemoveKey() error {
 	err := kc.cmdSet.RemoveKey()
 	if err != nil {
-		internal.Printf("removeKey failed %+v", err)
+		Printf("removeKey failed %+v", err)
 		return err
 	}
 
@@ -310,7 +309,7 @@ func (kc *KeycardContext) RemoveKey() error {
 func (kc *KeycardContext) DeriveKey(path string) error {
 	err := kc.cmdSet.DeriveKey(path)
 	if err != nil {
-		internal.Printf("deriveKey failed %+v", err)
+		Printf("deriveKey failed %+v", err)
 		return err
 	}
 
@@ -320,18 +319,18 @@ func (kc *KeycardContext) DeriveKey(path string) error {
 func (kc *KeycardContext) SignWithPath(data []byte, path string) (*types.Signature, error) {
 	sig, err := kc.cmdSet.SignWithPath(data, path)
 	if err != nil {
-		internal.Printf("signWithPath failed %+v", err)
+		Printf("signWithPath failed %+v", err)
 		return nil, err
 	}
 
 	return sig, nil
 }
 
-func (kc *KeycardContext) ExportKey(derive bool, makeCurrent bool, onlyPublic bool, path string) (*internal.KeyPair, error) {
+func (kc *KeycardContext) ExportKey(derive bool, makeCurrent bool, onlyPublic bool, path string) (*KeyPair, error) {
 	address := ""
 	privKey, pubKey, err := kc.cmdSet.ExportKey(derive, makeCurrent, onlyPublic, path)
 	if err != nil {
-		internal.Printf("exportKey failed %+v", err)
+		Printf("exportKey failed %+v", err)
 		return nil, err
 	}
 
@@ -344,13 +343,13 @@ func (kc *KeycardContext) ExportKey(derive bool, makeCurrent bool, onlyPublic bo
 		address = crypto.PubkeyToAddress(*ecdsaPubKey).Hex()
 	}
 
-	return &internal.KeyPair{Address: address, PublicKey: pubKey, PrivateKey: privKey}, nil
+	return &KeyPair{Address: address, PublicKey: pubKey, PrivateKey: privKey}, nil
 }
 
 func (kc *KeycardContext) loadSeed(seed []byte) ([]byte, error) {
 	pubKey, err := kc.cmdSet.LoadSeed(seed)
 	if err != nil {
-		internal.Printf("loadSeed failed %+v", err)
+		Printf("loadSeed failed %+v", err)
 		return nil, err
 	}
 
@@ -366,17 +365,17 @@ func (kc *KeycardContext) Init(pin, puk, pairingPassword string) error {
 	secrets := keycard.NewSecrets(pin, puk, pairingPassword)
 	err := kc.cmdSet.Init(secrets)
 	if err != nil {
-		internal.Printf("init failed %+v", err)
+		Printf("init failed %+v", err)
 		return err
 	}
 
 	return nil
 }
 
-func (kc *KeycardContext) unpair(index uint8) error {
+func (kc *KeycardContext) Unpair(index uint8) error {
 	err := kc.cmdSet.Unpair(index)
 	if err != nil {
-		internal.Printf("unpair failed %+v", err)
+		Printf("Unpair failed %+v", err)
 		return err
 	}
 
@@ -384,13 +383,13 @@ func (kc *KeycardContext) unpair(index uint8) error {
 }
 
 func (kc *KeycardContext) UnpairCurrent() error {
-	return kc.unpair(uint8(kc.cmdSet.PairingInfo.Index))
+	return kc.Unpair(uint8(kc.cmdSet.PairingInfo.Index))
 }
 
 func (kc *KeycardContext) GetStatusApplication() (*types.ApplicationStatus, error) {
 	status, err := kc.cmdSet.GetStatusApplication()
 	if err != nil {
-		internal.Printf("getStatusApplication failed %+v", err)
+		Printf("getStatusApplication failed %+v", err)
 		return nil, err
 	}
 
@@ -400,7 +399,7 @@ func (kc *KeycardContext) GetStatusApplication() (*types.ApplicationStatus, erro
 func (kc *KeycardContext) ChangePin(pin string) error {
 	err := kc.cmdSet.ChangePIN(pin)
 	if err != nil {
-		internal.Printf("chaingePin failed %+v", err)
+		Printf("chaingePin failed %+v", err)
 		return err
 	}
 
@@ -410,7 +409,7 @@ func (kc *KeycardContext) ChangePin(pin string) error {
 func (kc *KeycardContext) ChangePuk(puk string) error {
 	err := kc.cmdSet.ChangePUK(puk)
 	if err != nil {
-		internal.Printf("chaingePuk failed %+v", err)
+		Printf("chaingePuk failed %+v", err)
 		return err
 	}
 
@@ -420,7 +419,7 @@ func (kc *KeycardContext) ChangePuk(puk string) error {
 func (kc *KeycardContext) ChangePairingPassword(pairingPassword string) error {
 	err := kc.cmdSet.ChangePairingSecret(pairingPassword)
 	if err != nil {
-		internal.Printf("chaingePairingPassword failed %+v", err)
+		Printf("chaingePairingPassword failed %+v", err)
 		return err
 	}
 
@@ -431,23 +430,23 @@ func (kc *KeycardContext) factoryResetFallback(retry bool) error {
 	cmdSet := globalplatform.NewCommandSet(kc.c)
 
 	if err := cmdSet.Select(); err != nil {
-		internal.Printf("select ISD failed", "error", err)
+		Printf("select ISD failed", "error", err)
 		return err
 	}
 
 	if err := cmdSet.OpenSecureChannel(); err != nil {
-		internal.Printf("open secure channel failed", "error", err)
+		Printf("open secure channel failed", "error", err)
 		return err
 	}
 
 	aid, err := identifiers.KeycardInstanceAID(1)
 	if err != nil {
-		internal.Printf("error getting keycard aid %+v", err)
+		Printf("error getting keycard aid %+v", err)
 		return err
 	}
 
 	if err := cmdSet.DeleteObject(aid); err != nil {
-		internal.Printf("error deleting keycard aid %+v", err)
+		Printf("error deleting keycard aid %+v", err)
 
 		if retry {
 			return kc.FactoryReset(false)
@@ -457,7 +456,7 @@ func (kc *KeycardContext) factoryResetFallback(retry bool) error {
 	}
 
 	if err := cmdSet.InstallKeycardApplet(); err != nil {
-		internal.Printf("error installing Keycard applet %+v", err)
+		Printf("error installing Keycard applet %+v", err)
 		return err
 	}
 
@@ -484,7 +483,7 @@ func (kc *KeycardContext) StoreMetadata(metadata *types.Metadata) error {
 	err := kc.cmdSet.StoreData(keycard.P1StoreDataPublic, metadata.Serialize())
 
 	if err != nil {
-		internal.Printf("storeMetadata failed %+v", err)
+		Printf("storeMetadata failed %+v", err)
 		return err
 	}
 
@@ -495,9 +494,25 @@ func (kc *KeycardContext) GetMetadata() (*types.Metadata, error) {
 	data, err := kc.cmdSet.GetData(keycard.P1StoreDataPublic)
 
 	if err != nil {
-		internal.Printf("getMetadata failed %+v", err)
+		Printf("getMetadata failed %+v", err)
 		return nil, err
 	}
 
 	return types.ParseMetadata(data)
+}
+
+func (kc *KeycardContext) PairingInfo() *types.PairingInfo {
+	return kc.cmdSet.PairingInfo
+}
+
+func (kc *KeycardContext) ApplicationInfo() *types.ApplicationInfo {
+	return kc.cmdSet.ApplicationInfo
+}
+
+func (kc *KeycardContext) Connected() <-chan bool {
+	return kc.connected
+}
+
+func (kc *KeycardContext) RunErr() error {
+	return kc.runErr
 }
