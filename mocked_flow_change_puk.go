@@ -2,13 +2,14 @@ package statuskeycardgo
 
 import (
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
 func (mkf *MockedKeycardFlow) handleChangePukFlow() {
 	flowStatus := FlowStatus{}
 
 	if mkf.insertedKeycard.NotStatusKeycard {
-		flowStatus[ErrorKey] = ErrorNotAKeycard
+		flowStatus[internal.ErrorKey] = internal.ErrorNotAKeycard
 		flowStatus[InstanceUID] = ""
 		flowStatus[KeyUID] = ""
 		flowStatus[FreeSlots] = 0
@@ -23,7 +24,7 @@ func (mkf *MockedKeycardFlow) handleChangePukFlow() {
 	}
 
 	if mkf.insertedKeycard.InstanceUID == "" && mkf.insertedKeycard.KeyUID == "" {
-		flowStatus[ErrorKey] = ErrorRequireInit
+		flowStatus[internal.ErrorKey] = internal.ErrorRequireInit
 		flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
 		mkf.state = Paused
 		signal.Send(EnterNewPIN, flowStatus)
@@ -31,7 +32,7 @@ func (mkf *MockedKeycardFlow) handleChangePukFlow() {
 	}
 
 	if mkf.insertedKeycard.FreePairingSlots == 0 {
-		flowStatus[ErrorKey] = FreeSlots
+		flowStatus[internal.ErrorKey] = FreeSlots
 		flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
 		mkf.state = Paused
 		signal.Send(SwapCard, flowStatus)
@@ -64,7 +65,7 @@ func (mkf *MockedKeycardFlow) handleChangePukFlow() {
 
 	finalType := EnterPIN
 	if mkf.insertedKeycard.PukRetries == 0 {
-		flowStatus[ErrorKey] = PUKRetries
+		flowStatus[internal.ErrorKey] = PUKRetries
 		finalType = SwapCard
 	} else {
 		if mkf.insertedKeycard.PinRetries == 0 {
@@ -73,28 +74,28 @@ func (mkf *MockedKeycardFlow) handleChangePukFlow() {
 					if enteredPUK != mkf.insertedKeycard.Puk {
 						mkf.insertedKeycard.PukRetries--
 						if mkf.insertedKeycard.PukRetries == 0 {
-							flowStatus[ErrorKey] = PUKRetries
+							flowStatus[internal.ErrorKey] = PUKRetries
 							finalType = SwapCard
 						} else {
-							flowStatus[ErrorKey] = PUK
+							flowStatus[internal.ErrorKey] = PUK
 							finalType = EnterPUK
 						}
 					}
 				} else {
-					flowStatus[ErrorKey] = ErrorUnblocking
+					flowStatus[internal.ErrorKey] = internal.ErrorUnblocking
 					finalType = EnterNewPIN
 				}
 			} else {
-				flowStatus[ErrorKey] = ""
+				flowStatus[internal.ErrorKey] = ""
 				finalType = EnterPUK
 			}
 		} else {
 			if len(enteredNewPIN) == 0 && len(enteredPIN) == defPINLen && enteredPIN != mkf.insertedKeycard.Pin {
 				mkf.insertedKeycard.PinRetries--
-				flowStatus[ErrorKey] = PIN
+				flowStatus[internal.ErrorKey] = PIN
 				finalType = EnterPIN
 				if mkf.insertedKeycard.PinRetries == 0 {
-					flowStatus[ErrorKey] = ""
+					flowStatus[internal.ErrorKey] = ""
 					finalType = EnterPUK
 				}
 			}
@@ -108,10 +109,10 @@ func (mkf *MockedKeycardFlow) handleChangePukFlow() {
 			mkf.insertedKeycard.PinRetries = maxPINRetries
 			mkf.insertedKeycard.PukRetries = maxPUKRetries
 			mkf.insertedKeycard.Pin = enteredPIN
-			flowStatus[ErrorKey] = ErrorChanging
+			flowStatus[internal.ErrorKey] = internal.ErrorChanging
 			finalType = EnterNewPUK
 		} else if overwrite && len(enteredPUK) == defPUKLen && enteredPUK == enteredNewPUK {
-			flowStatus[ErrorKey] = ""
+			flowStatus[internal.ErrorKey] = ""
 			mkf.insertedKeycard.PinRetries = maxPINRetries
 			mkf.insertedKeycard.PukRetries = maxPUKRetries
 			mkf.insertedKeycard.Puk = enteredPUK

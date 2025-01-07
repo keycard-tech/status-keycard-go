@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
 type cardStatus struct {
@@ -92,7 +93,7 @@ func (f *KeycardFlow) runFlow() {
 
 		if _, ok := err.(*restartError); !ok {
 			if result == nil {
-				result = FlowStatus{ErrorKey: err.Error()}
+				result = FlowStatus{internal.ErrorKey: err.Error()}
 				if f.cardInfo.freeSlots != -1 {
 					result[InstanceUID] = f.cardInfo.instanceUID
 					result[KeyUID] = f.cardInfo.keyUID
@@ -111,7 +112,7 @@ func (f *KeycardFlow) runFlow() {
 }
 
 func (f *KeycardFlow) pause(action string, errMsg string, status FlowParams) {
-	status[ErrorKey] = errMsg
+	status[internal.ErrorKey] = errMsg
 
 	if f.cardInfo.freeSlots != -1 {
 		status[InstanceUID] = f.cardInfo.instanceUID
@@ -163,7 +164,7 @@ func (f *KeycardFlow) requireKeys() error {
 		return nil
 	}
 
-	return f.pauseAndRestart(SwapCard, ErrorNoKeys)
+	return f.pauseAndRestart(SwapCard, internal.ErrorNoKeys)
 }
 
 func (f *KeycardFlow) requireNoKeys() error {
@@ -175,7 +176,7 @@ func (f *KeycardFlow) requireNoKeys() error {
 		return nil
 	}
 
-	return f.pauseAndRestart(SwapCard, ErrorHasKeys)
+	return f.pauseAndRestart(SwapCard, internal.ErrorHasKeys)
 }
 
 func (f *KeycardFlow) closeKeycard(kc *keycardContext) {
@@ -212,7 +213,7 @@ func (f *KeycardFlow) connect() (*keycardContext, error) {
 
 			return kc, nil
 		case <-t.C:
-			f.pause(InsertCard, ErrorConnection, FlowParams{})
+			f.pause(InsertCard, internal.ErrorConnection, FlowParams{})
 		}
 	}
 }
@@ -269,12 +270,12 @@ func (f *KeycardFlow) connectedFlow() (FlowStatus, error) {
 	case GetMetadata:
 		return f.getMetadataFlow(kc)
 	default:
-		return nil, errors.New(ErrorUnknownFlow)
+		return nil, errors.New(internal.ErrorUnknownFlow)
 	}
 }
 
 func (f *KeycardFlow) getAppInfoFlow(kc *keycardContext) (FlowStatus, error) {
-	res := FlowStatus{ErrorKey: ErrorOK, AppInfo: toAppInfo(kc.cmdSet.ApplicationInfo)}
+	res := FlowStatus{internal.ErrorKey: internal.ErrorOK, AppInfo: internal.ToAppInfo(kc.cmdSet.ApplicationInfo)}
 	err := f.openSCAndAuthenticate(kc, true)
 
 	if err == nil {
@@ -566,7 +567,7 @@ func (f *KeycardFlow) getMetadataFlow(kc *keycardContext) (FlowStatus, error) {
 
 	if resolveAddr, ok := f.params[ResolveAddr]; ok && resolveAddr.(bool) {
 		if f.cardInfo.keyUID == "" {
-			return FlowStatus{ErrorKey: ErrorNoKeys, InstanceUID: f.cardInfo.instanceUID, KeyUID: f.cardInfo.keyUID, CardMeta: m}, nil
+			return FlowStatus{internal.ErrorKey: internal.ErrorNoKeys, InstanceUID: f.cardInfo.instanceUID, KeyUID: f.cardInfo.keyUID, CardMeta: m}, nil
 		}
 
 		err := f.openSCAndAuthenticate(kc, false)

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
 type MockedKeycardFlow struct {
@@ -164,7 +165,7 @@ func (mkf *MockedKeycardFlow) RegisterKeycard(cardIndex int, readerState MockedR
 	case MaxPUKRetriesReached:
 		newKeycard.PukRetries = 0
 	case KeycardWithMnemonicOnly:
-		newKeycard.Metadata = Metadata{}
+		newKeycard.Metadata = internal.Metadata{}
 	case KeycardWithMnemonicAndMedatada:
 		*newKeycard = mockedKeycard
 	default:
@@ -189,10 +190,10 @@ func (mkf *MockedKeycardFlow) RegisterKeycard(cardIndex int, readerState MockedR
 func (mkf *MockedKeycardFlow) runFlow() {
 	switch mkf.currentReaderState {
 	case NoReader:
-		signal.Send(FlowResult, FlowStatus{ErrorKey: ErrorNoReader})
+		signal.Send(FlowResult, FlowStatus{internal.ErrorKey: internal.ErrorNoReader})
 		return
 	case NoKeycard:
-		signal.Send(InsertCard, FlowStatus{ErrorKey: ErrorConnection})
+		signal.Send(InsertCard, FlowStatus{internal.ErrorKey: internal.ErrorConnection})
 		return
 	default:
 		switch mkf.flowType {

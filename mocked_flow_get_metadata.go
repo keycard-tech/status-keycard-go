@@ -6,13 +6,14 @@ import (
 	"strings"
 
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
 func (mkf *MockedKeycardFlow) handleGetMetadataFlow() {
 	flowStatus := FlowStatus{}
 
 	if mkf.insertedKeycard.NotStatusKeycard {
-		flowStatus[ErrorKey] = ErrorNotAKeycard
+		flowStatus[internal.ErrorKey] = internal.ErrorNotAKeycard
 		flowStatus[InstanceUID] = ""
 		flowStatus[KeyUID] = ""
 		flowStatus[FreeSlots] = 0
@@ -23,7 +24,7 @@ func (mkf *MockedKeycardFlow) handleGetMetadataFlow() {
 
 	if mkf.insertedKeycard.InstanceUID == "" || mkf.insertedKeycard.KeyUID == "" {
 		mkf.state = Idle
-		signal.Send(FlowResult, FlowStatus{ErrorKey: ErrorNoKeys})
+		signal.Send(FlowResult, FlowStatus{internal.ErrorKey: internal.ErrorNoKeys})
 		return
 	}
 
@@ -34,7 +35,7 @@ func (mkf *MockedKeycardFlow) handleGetMetadataFlow() {
 
 	if resolveAddr, ok := mkf.params[ResolveAddr]; ok && resolveAddr.(bool) {
 		if mkf.insertedKeycard.FreePairingSlots == 0 {
-			flowStatus[ErrorKey] = FreeSlots
+			flowStatus[internal.ErrorKey] = FreeSlots
 			flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
 			mkf.state = Paused
 			signal.Send(SwapCard, flowStatus)
@@ -63,7 +64,7 @@ func (mkf *MockedKeycardFlow) handleGetMetadataFlow() {
 
 		finalType := EnterPIN
 		if mkf.insertedKeycard.PukRetries == 0 {
-			flowStatus[ErrorKey] = PUKRetries
+			flowStatus[internal.ErrorKey] = PUKRetries
 			finalType = SwapCard
 		} else {
 			if mkf.insertedKeycard.PinRetries == 0 {
@@ -72,28 +73,28 @@ func (mkf *MockedKeycardFlow) handleGetMetadataFlow() {
 						if enteredPUK != mkf.insertedKeycard.Puk {
 							mkf.insertedKeycard.PukRetries--
 							if mkf.insertedKeycard.PukRetries == 0 {
-								flowStatus[ErrorKey] = PUKRetries
+								flowStatus[internal.ErrorKey] = PUKRetries
 								finalType = SwapCard
 							} else {
-								flowStatus[ErrorKey] = PUK
+								flowStatus[internal.ErrorKey] = PUK
 								finalType = EnterPUK
 							}
 						}
 					} else {
-						flowStatus[ErrorKey] = ErrorUnblocking
+						flowStatus[internal.ErrorKey] = internal.ErrorUnblocking
 						finalType = EnterNewPIN
 					}
 				} else {
-					flowStatus[ErrorKey] = ""
+					flowStatus[internal.ErrorKey] = ""
 					finalType = EnterPUK
 				}
 			} else {
 				if len(enteredNewPIN) == 0 && len(enteredPIN) == defPINLen && enteredPIN != mkf.insertedKeycard.Pin {
 					mkf.insertedKeycard.PinRetries--
-					flowStatus[ErrorKey] = PIN
+					flowStatus[internal.ErrorKey] = PIN
 					finalType = EnterPIN
 					if mkf.insertedKeycard.PinRetries == 0 {
-						flowStatus[ErrorKey] = ""
+						flowStatus[internal.ErrorKey] = ""
 						finalType = EnterPUK
 					}
 				}
@@ -115,7 +116,7 @@ func (mkf *MockedKeycardFlow) handleGetMetadataFlow() {
 			mkf.insertedKeycard.PinRetries = maxPINRetries
 			mkf.insertedKeycard.PukRetries = maxPUKRetries
 			mkf.insertedKeycard.Pin = enteredPIN
-			flowStatus[ErrorKey] = ""
+			flowStatus[internal.ErrorKey] = ""
 			flowStatus[CardMeta] = mkf.insertedKeycard.Metadata
 			mkf.state = Idle
 			signal.Send(FlowResult, flowStatus)
@@ -130,11 +131,11 @@ func (mkf *MockedKeycardFlow) handleGetMetadataFlow() {
 		return
 	}
 
-	pubMetadata := Metadata{
+	pubMetadata := internal.Metadata{
 		Name: mkf.insertedKeycard.Metadata.Name,
 	}
 	for _, m := range mkf.insertedKeycard.Metadata.Wallets {
-		pubMetadata.Wallets = append(pubMetadata.Wallets, Wallet{
+		pubMetadata.Wallets = append(pubMetadata.Wallets, internal.Wallet{
 			Path: m.Path,
 		})
 	}

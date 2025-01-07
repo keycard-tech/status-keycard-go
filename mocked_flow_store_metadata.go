@@ -5,13 +5,14 @@ import (
 	"strings"
 
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
 func (mkf *MockedKeycardFlow) handleStoreMetadataFlow() {
 	flowStatus := FlowStatus{}
 
 	if mkf.insertedKeycard.NotStatusKeycard {
-		flowStatus[ErrorKey] = ErrorNotAKeycard
+		flowStatus[internal.ErrorKey] = internal.ErrorNotAKeycard
 		flowStatus[InstanceUID] = ""
 		flowStatus[KeyUID] = ""
 		flowStatus[FreeSlots] = 0
@@ -40,7 +41,7 @@ func (mkf *MockedKeycardFlow) handleStoreMetadataFlow() {
 
 	if len(enteredPIN) == defPINLen && enteredPIN == mkf.insertedKeycard.Pin && enteredCardName != "" {
 		mkf.insertedKeycard.Metadata.Name = enteredCardName
-		mkf.insertedKeycard.Metadata.Wallets = []Wallet{}
+		mkf.insertedKeycard.Metadata.Wallets = []internal.Wallet{}
 
 		if v, ok := mkf.params[WalletPaths]; ok {
 			wallets := v.([]interface{})
@@ -50,7 +51,7 @@ func (mkf *MockedKeycardFlow) handleStoreMetadataFlow() {
 					panic("path must start with " + walletRoothPath)
 				}
 
-				tmpWallet := Wallet{
+				tmpWallet := internal.Wallet{
 					Path: p.(string),
 				}
 

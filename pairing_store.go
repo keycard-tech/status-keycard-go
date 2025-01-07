@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
 type pairingStore struct {
 	path   string
-	values map[string]*PairingInfo
+	values map[string]*internal.PairingInfo
 }
 
 func newPairingStore(storage string) (*pairingStore, error) {
@@ -24,7 +25,7 @@ func newPairingStore(storage string) (*pairingStore, error) {
 				return nil, err
 			}
 
-			p.values = map[string]*PairingInfo{}
+			p.values = map[string]*internal.PairingInfo{}
 		} else {
 			return nil, err
 		}
@@ -55,12 +56,12 @@ func (p *pairingStore) save() error {
 	return nil
 }
 
-func (p *pairingStore) store(instanceUID string, pairing *PairingInfo) error {
+func (p *pairingStore) store(instanceUID string, pairing *internal.PairingInfo) error {
 	p.values[instanceUID] = pairing
 	return p.save()
 }
 
-func (p *pairingStore) get(instanceUID string) *PairingInfo {
+func (p *pairingStore) get(instanceUID string) *internal.PairingInfo {
 	return p.values[instanceUID]
 }
 

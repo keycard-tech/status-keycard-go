@@ -1,15 +1,14 @@
-package statuskeycardgo
+package internal
 
 import (
 	"encoding/json"
-	"github.com/status-im/status-keycard-go/internal"
 )
 
 type HexString []byte
 
 // MarshalJSON serializes HexString to hex
 func (s HexString) MarshalJSON() ([]byte, error) {
-	bytes, err := json.Marshal(internal.Btox(s))
+	bytes, err := json.Marshal(Btox(s))
 	return bytes, err
 }
 
@@ -20,7 +19,7 @@ func (s *HexString) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	str, err := internal.Xtob(x)
+	str, err := Xtob(x)
 	if err != nil {
 		return err
 	}

@@ -5,13 +5,14 @@ import (
 	"strings"
 
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
 func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 	flowStatus := FlowStatus{}
 
 	if mkf.insertedKeycard.NotStatusKeycard {
-		flowStatus[ErrorKey] = ErrorNotAKeycard
+		flowStatus[internal.ErrorKey] = internal.ErrorNotAKeycard
 		flowStatus[InstanceUID] = ""
 		flowStatus[KeyUID] = ""
 		flowStatus[FreeSlots] = 0
@@ -72,7 +73,7 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 	}
 
 	if mkf.insertedKeycard.InstanceUID != "" && mkf.insertedKeycard.KeyUID != "" {
-		flowStatus[ErrorKey] = ErrorHasKeys
+		flowStatus[internal.ErrorKey] = internal.ErrorHasKeys
 		flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
 		mkf.state = Paused
 		signal.Send(finalType, flowStatus)
@@ -95,7 +96,7 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 			}
 
 			finalType = EnterMnemonic
-			flowStatus[ErrorKey] = ErrorLoading
+			flowStatus[internal.ErrorKey] = internal.ErrorLoading
 			flowStatus[MnemonicIdxs] = indexes
 			flowStatus[InstanceUID] = mkf.insertedKeycard.InstanceUID
 			flowStatus[FreeSlots] = mkf.insertedKeycard.FreePairingSlots
@@ -129,7 +130,7 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 	}
 
 	finalType = EnterNewPIN
-	flowStatus[ErrorKey] = ErrorRequireInit
+	flowStatus[internal.ErrorKey] = internal.ErrorRequireInit
 	mkf.state = Paused
 	signal.Send(finalType, flowStatus)
 }
