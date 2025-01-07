@@ -6,6 +6,7 @@ import (
 
 	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
+	"github.com/status-im/status-keycard-go/pkg/pairing"
 )
 
 type cardStatus struct {
@@ -20,13 +21,13 @@ type KeycardFlow struct {
 	flowType FlowType
 	state    runState
 	wakeUp   chan (struct{})
-	pairings *pairingStore
+	pairings *pairing.Store
 	params   FlowParams
 	cardInfo cardStatus
 }
 
 func NewFlow(storageDir string) (*KeycardFlow, error) {
-	p, err := newPairingStore(storageDir)
+	p, err := pairing.NewStore(storageDir)
 
 	if err != nil {
 		return nil, err

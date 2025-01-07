@@ -68,7 +68,7 @@ func (f *KeycardFlow) pair(kc *internal.KeycardContext) error {
 	pairing, err := kc.Pair(pairingPass.(string))
 
 	if err == nil {
-		return f.pairings.store(f.cardInfo.instanceUID, internal.ToPairInfo(pairing))
+		return f.pairings.Store(f.cardInfo.instanceUID, internal.ToPairInfo(pairing))
 	} else if internal.IsSCardError(err) {
 		return restartErr()
 	}
@@ -134,7 +134,7 @@ func (f *KeycardFlow) openSC(kc *internal.KeycardContext, giveup bool) error {
 	if !kc.ApplicationInfo().Initialized && !giveup {
 		return f.initCard(kc)
 	} else {
-		pairing = f.pairings.get(f.cardInfo.instanceUID)
+		pairing = f.pairings.Get(f.cardInfo.instanceUID)
 	}
 
 	if pairing != nil {
@@ -156,7 +156,7 @@ func (f *KeycardFlow) openSC(kc *internal.KeycardContext, giveup bool) error {
 			return restartErr()
 		}
 
-		f.pairings.delete(f.cardInfo.instanceUID)
+		f.pairings.Delete(f.cardInfo.instanceUID)
 	}
 
 	if giveup {

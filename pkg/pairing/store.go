@@ -1,4 +1,4 @@
-package statuskeycardgo
+package pairing
 
 import (
 	"encoding/json"

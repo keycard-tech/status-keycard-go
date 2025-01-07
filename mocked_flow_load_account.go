@@ -88,7 +88,7 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 				mkf.insertedKeycard.PairingInfo = mkf.insertedKeycardHelper.PairingInfo
 			}
 
-			mkf.pairings.store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+			mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
 
 			var indexes []int
 			for len(indexes) < enteredMnemonicLength {
@@ -117,7 +117,7 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 				mkf.insertedKeycard.PukRetries = maxPUKRetries
 				mkf.insertedKeycard.FreePairingSlots = maxFreeSlots - 1
 
-				mkf.pairings.store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+				mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
 
 				finalType = FlowResult
 				flowStatus[InstanceUID] = mkf.insertedKeycard.InstanceUID

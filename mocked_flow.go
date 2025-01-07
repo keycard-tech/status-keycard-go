@@ -8,13 +8,14 @@ import (
 
 	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
+	"github.com/status-im/status-keycard-go/pkg/pairing"
 )
 
 type MockedKeycardFlow struct {
 	flowType FlowType
 	state    runState
 	params   FlowParams
-	pairings *pairingStore
+	pairings *pairing.Store
 
 	mockedKeycardsStoreFilePath string
 
@@ -28,7 +29,7 @@ type MockedKeycardFlow struct {
 }
 
 func NewMockedFlow(storageDir string) (*MockedKeycardFlow, error) {
-	p, err := newPairingStore(storageDir)
+	p, err := pairing.NewStore(storageDir)
 	if err != nil {
 		return nil, err
 	}
@@ -219,9 +220,9 @@ func (mkf *MockedKeycardFlow) runFlow() {
 	}
 
 	if mkf.insertedKeycard.InstanceUID != "" {
-		pairing := mkf.pairings.get(mkf.insertedKeycard.InstanceUID)
+		pairing := mkf.pairings.Get(mkf.insertedKeycard.InstanceUID)
 		if pairing == nil {
-			mkf.pairings.store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+			mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
 		}
 	}
 
