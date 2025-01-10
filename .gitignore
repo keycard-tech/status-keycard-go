@@ -1,4 +1,5 @@
 .vscode
+.idea
 /keycard
 /build
 /status-keycard-go

@@ -1,4 +1,4 @@
-package statuskeycardgo
+package internal
 
 const (
 	ErrorKey         = "error"

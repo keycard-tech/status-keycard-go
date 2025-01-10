@@ -8,13 +8,14 @@ import (
 	"encoding/json"
 	"unsafe"
 
-	skg "github.com/status-im/status-keycard-go"
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/pkg/flow"
+	"github.com/status-im/status-keycard-go/pkg/flow/mocked"
 )
 
 func main() {}
 
-var globalFlow *skg.MockedKeycardFlow
+var globalFlow *mocked.MockedKeycardFlow
 
 func retErr(err error) *C.char {
 	if err == nil {
@@ -24,8 +25,8 @@ func retErr(err error) *C.char {
 	}
 }
 
-func jsonToParams(jsonParams *C.char) (skg.FlowParams, error) {
-	var params skg.FlowParams
+func jsonToParams(jsonParams *C.char) (flow.FlowParams, error) {
+	var params flow.FlowParams
 
 	if err := json.Unmarshal([]byte(C.GoString(jsonParams)), &params); err != nil {
 		return nil, err
@@ -34,13 +35,13 @@ func jsonToParams(jsonParams *C.char) (skg.FlowParams, error) {
 	return params, nil
 }
 
-func jsonToMockedKeycard(jsonKeycard *C.char) (*skg.MockedKeycard, error) {
+func jsonToMockedKeycard(jsonKeycard *C.char) (*mocked.MockedKeycard, error) {
 	bytes := []byte(C.GoString(jsonKeycard))
 	if len(bytes) == 0 {
 		return nil, nil
 	}
 
-	mockedKeycard := &skg.MockedKeycard{}
+	mockedKeycard := &mocked.MockedKeycard{}
 	if err := json.Unmarshal(bytes, mockedKeycard); err != nil {
 		return nil, err
 	}
@@ -52,7 +53,7 @@ func jsonToMockedKeycard(jsonKeycard *C.char) (*skg.MockedKeycard, error) {
 func KeycardInitFlow(storageDir *C.char) *C.char {
 	var err error
 
-	globalFlow, err = skg.NewMockedFlow(C.GoString(storageDir))
+	globalFlow, err = mocked.NewMockedFlow(C.GoString(storageDir))
 
 	return retErr(err)
 }
@@ -65,7 +66,7 @@ func KeycardStartFlow(flowType C.int, jsonParams *C.char) *C.char {
 		return retErr(err)
 	}
 
-	err = globalFlow.Start(skg.FlowType(flowType), params)
+	err = globalFlow.Start(flow.FlowType(flowType), params)
 	return retErr(err)
 }
 
@@ -109,7 +110,7 @@ func MockedLibRegisterKeycard(cardIndex C.int, readerState C.int, keycardState C
 		return retErr(err)
 	}
 
-	err = globalFlow.RegisterKeycard(int(cardIndex), skg.MockedReaderState(readerState), skg.MockedKeycardState(keycardState),
+	err = globalFlow.RegisterKeycard(int(cardIndex), mocked.MockedReaderState(readerState), mocked.MockedKeycardState(keycardState),
 		mockedKeycardInst, mockedKeycardHelperInst)
 	return retErr(err)
 }

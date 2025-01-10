@@ -1,4 +1,4 @@
-package statuskeycardgo
+package mocked
 
 import (
 	"encoding/json"
@@ -7,13 +7,16 @@ import (
 	"path/filepath"
 
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/internal"
+	"github.com/status-im/status-keycard-go/pkg/pairing"
+	"github.com/status-im/status-keycard-go/pkg/flow"
 )
 
 type MockedKeycardFlow struct {
-	flowType FlowType
-	state    runState
-	params   FlowParams
-	pairings *pairingStore
+	flowType flow.FlowType
+	state    flow.RunState
+	params   flow.FlowParams
+	pairings *pairing.Store
 
 	mockedKeycardsStoreFilePath string
 
@@ -27,7 +30,7 @@ type MockedKeycardFlow struct {
 }
 
 func NewMockedFlow(storageDir string) (*MockedKeycardFlow, error) {
-	p, err := newPairingStore(storageDir)
+	p, err := pairing.NewStore(storageDir)
 	if err != nil {
 		return nil, err
 	}
@@ -48,27 +51,27 @@ func NewMockedFlow(storageDir string) (*MockedKeycardFlow, error) {
 	return flow, nil
 }
 
-func (mkf *MockedKeycardFlow) Start(flowType FlowType, params FlowParams) error {
-	if mkf.state != Idle {
+func (mkf *MockedKeycardFlow) Start(flowType flow.FlowType, params flow.FlowParams) error {
+	if mkf.state != flow.Idle {
 		return errors.New("already running")
 	}
 
 	mkf.flowType = flowType
 	mkf.params = params
-	mkf.state = Running
+	mkf.state = flow.Running
 
 	go mkf.runFlow()
 
 	return nil
 }
 
-func (mkf *MockedKeycardFlow) Resume(params FlowParams) error {
-	if mkf.state != Paused {
+func (mkf *MockedKeycardFlow) Resume(params flow.FlowParams) error {
+	if mkf.state != flow.Paused {
 		return errors.New("only paused flows can be resumed")
 	}
 
 	if mkf.params == nil {
-		mkf.params = FlowParams{}
+		mkf.params = flow.FlowParams{}
 	}
 
 	for k, v := range params {
@@ -82,11 +85,11 @@ func (mkf *MockedKeycardFlow) Resume(params FlowParams) error {
 
 func (mkf *MockedKeycardFlow) Cancel() error {
 
-	if mkf.state == Idle {
+	if mkf.state == flow.Idle {
 		return errors.New("cannot cancel idle flow")
 	}
 
-	mkf.state = Idle
+	mkf.state = flow.Idle
 	mkf.params = nil
 
 	return nil
@@ -95,7 +98,7 @@ func (mkf *MockedKeycardFlow) Cancel() error {
 func (mkf *MockedKeycardFlow) ReaderPluggedIn() error {
 	mkf.currentReaderState = NoKeycard
 
-	if mkf.state == Running {
+	if mkf.state == flow.Running {
 		go mkf.runFlow()
 	}
 
@@ -122,7 +125,7 @@ func (mkf *MockedKeycardFlow) KeycardInserted(cardIndex int) error {
 	mkf.insertedKeycard = mkf.registeredKeycards[cardIndex]
 	mkf.insertedKeycardHelper = mkf.registeredKeycardHelpers[cardIndex]
 
-	if mkf.state == Running {
+	if mkf.state == flow.Running {
 		go mkf.runFlow()
 	}
 
@@ -135,7 +138,7 @@ func (mkf *MockedKeycardFlow) KeycardRemoved() error {
 	mkf.insertedKeycard = nil
 	mkf.insertedKeycardHelper = nil
 
-	if mkf.state == Running {
+	if mkf.state == flow.Running {
 		go mkf.runFlow()
 	}
 
@@ -144,7 +147,7 @@ func (mkf *MockedKeycardFlow) KeycardRemoved() error {
 
 func (mkf *MockedKeycardFlow) RegisterKeycard(cardIndex int, readerState MockedReaderState, keycardState MockedKeycardState,
 	keycard *MockedKeycard, keycardHelper *MockedKeycard) error {
-	mkf.state = Idle
+	mkf.state = flow.Idle
 	mkf.params = nil
 
 	newKeycard := &MockedKeycard{}
@@ -164,7 +167,7 @@ func (mkf *MockedKeycardFlow) RegisterKeycard(cardIndex int, readerState MockedR
 	case MaxPUKRetriesReached:
 		newKeycard.PukRetries = 0
 	case KeycardWithMnemonicOnly:
-		newKeycard.Metadata = Metadata{}
+		newKeycard.Metadata = internal.Metadata{}
 	case KeycardWithMnemonicAndMedatada:
 		*newKeycard = mockedKeycard
 	default:
@@ -189,38 +192,38 @@ func (mkf *MockedKeycardFlow) RegisterKeycard(cardIndex int, readerState MockedR
 func (mkf *MockedKeycardFlow) runFlow() {
 	switch mkf.currentReaderState {
 	case NoReader:
-		signal.Send(FlowResult, FlowStatus{ErrorKey: ErrorNoReader})
+		signal.Send(flow.FlowResult, flow.FlowStatus{internal.ErrorKey: internal.ErrorNoReader})
 		return
 	case NoKeycard:
-		signal.Send(InsertCard, FlowStatus{ErrorKey: ErrorConnection})
+		signal.Send(flow.InsertCard, flow.FlowStatus{internal.ErrorKey: internal.ErrorConnection})
 		return
 	default:
 		switch mkf.flowType {
-		case GetAppInfo:
+		case flow.GetAppInfo:
 			mkf.handleGetAppInfoFlow()
-		case RecoverAccount:
+		case flow.RecoverAccount:
 			mkf.handleRecoverAccountFlow()
-		case LoadAccount:
+		case flow.LoadAccount:
 			mkf.handleLoadAccountFlow()
-		case Login:
+		case flow.Login:
 			mkf.handleLoginFlow()
-		case ExportPublic:
+		case flow.ExportPublic:
 			mkf.handleExportPublicFlow()
-		case ChangePIN:
+		case flow.ChangePIN:
 			mkf.handleChangePinFlow()
-		case ChangePUK:
+		case flow.ChangePUK:
 			mkf.handleChangePukFlow()
-		case StoreMetadata:
+		case flow.StoreMetadata:
 			mkf.handleStoreMetadataFlow()
-		case GetMetadata:
+		case flow.GetMetadata:
 			mkf.handleGetMetadataFlow()
 		}
 	}
 
 	if mkf.insertedKeycard.InstanceUID != "" {
-		pairing := mkf.pairings.get(mkf.insertedKeycard.InstanceUID)
+		pairing := mkf.pairings.Get(mkf.insertedKeycard.InstanceUID)
 		if pairing == nil {
-			mkf.pairings.store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+			mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
 		}
 	}
 

@@ -1,18 +1,19 @@
-package statuskeycardgo
+package pairing
 
 import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
-type pairingStore struct {
+type Store struct {
 	path   string
-	values map[string]*PairingInfo
+	values map[string]*internal.PairingInfo
 }
 
-func newPairingStore(storage string) (*pairingStore, error) {
-	p := &pairingStore{path: storage}
+func NewStore(storage string) (*Store, error) {
+	p := &Store{path: storage}
 	b, err := os.ReadFile(p.path)
 
 	if err != nil {
@@ -24,7 +25,7 @@ func newPairingStore(storage string) (*pairingStore, error) {
 				return nil, err
 			}
 
-			p.values = map[string]*PairingInfo{}
+			p.values = map[string]*internal.PairingInfo{}
 		} else {
 			return nil, err
 		}
@@ -39,7 +40,7 @@ func newPairingStore(storage string) (*pairingStore, error) {
 	return p, nil
 }
 
-func (p *pairingStore) save() error {
+func (p *Store) save() error {
 	b, err := json.Marshal(p.values)
 
 	if err != nil {
@@ -55,15 +56,15 @@ func (p *pairingStore) save() error {
 	return nil
 }
 
-func (p *pairingStore) store(instanceUID string, pairing *PairingInfo) error {
+func (p *Store) Store(instanceUID string, pairing *internal.PairingInfo) error {
 	p.values[instanceUID] = pairing
 	return p.save()
 }
 
-func (p *pairingStore) get(instanceUID string) *PairingInfo {
+func (p *Store) Get(instanceUID string) *internal.PairingInfo {
 	return p.values[instanceUID]
 }
 
-func (p *pairingStore) delete(instanceUID string) {
+func (p *Store) Delete(instanceUID string) {
 	delete(p.values, instanceUID)
 }

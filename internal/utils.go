@@ -1,4 +1,4 @@
-package statuskeycardgo
+package internal
 
 import (
 	"encoding/binary"
@@ -10,12 +10,12 @@ import (
 	ktypes "github.com/status-im/keycard-go/types"
 )
 
-func isSCardError(err error) bool {
+func IsSCardError(err error) bool {
 	_, ok := err.(scard.Error)
 	return ok
 }
 
-func getRetries(err error) (int, bool) {
+func GetRetries(err error) (int, bool) {
 	if wrongPIN, ok := err.(*keycard.WrongPINError); ok {
 		return wrongPIN.RemainingAttempts, ok
 	} else if wrongPUK, ok := err.(*keycard.WrongPUKError); ok {
@@ -25,15 +25,15 @@ func getRetries(err error) (int, bool) {
 	}
 }
 
-func btox(bytes []byte) string {
+func Btox(bytes []byte) string {
 	return hex.EncodeToString(bytes)
 }
 
-func xtob(str string) ([]byte, error) {
+func Xtob(str string) ([]byte, error) {
 	return hex.DecodeString(str)
 }
 
-func bytesToInt(s []byte) int {
+func BytesToInt(s []byte) int {
 	if len(s) > 4 {
 		return 0
 	}
@@ -43,24 +43,24 @@ func bytesToInt(s []byte) int {
 	return int(binary.BigEndian.Uint32(b[:]))
 }
 
-func toAppInfo(r *ktypes.ApplicationInfo) ApplicationInfo {
+func ToAppInfo(r *ktypes.ApplicationInfo) ApplicationInfo {
 	return ApplicationInfo{
 		Initialized:    r.Initialized,
 		InstanceUID:    r.InstanceUID,
-		Version:        bytesToInt(r.Version),
-		AvailableSlots: bytesToInt(r.AvailableSlots),
+		Version:        BytesToInt(r.Version),
+		AvailableSlots: BytesToInt(r.AvailableSlots),
 		KeyUID:         r.KeyUID,
 	}
 }
 
-func toPairInfo(r *ktypes.PairingInfo) *PairingInfo {
+func ToPairInfo(r *ktypes.PairingInfo) *PairingInfo {
 	return &PairingInfo{
 		Key:   r.Key,
 		Index: r.Index,
 	}
 }
 
-func toSignature(r *ktypes.Signature) *Signature {
+func ToSignature(r *ktypes.Signature) *Signature {
 	return &Signature{
 		R: r.R(),
 		S: r.S(),
@@ -68,7 +68,7 @@ func toSignature(r *ktypes.Signature) *Signature {
 	}
 }
 
-func toMetadata(r *ktypes.Metadata) *Metadata {
+func ToMetadata(r *ktypes.Metadata) *Metadata {
 	paths := r.Paths()
 	wallets := make([]Wallet, len(paths))
 

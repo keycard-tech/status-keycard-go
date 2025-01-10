@@ -1,4 +1,4 @@
-package statuskeycardgo
+package flow
 
 import (
 	"errors"
@@ -8,34 +8,35 @@ import (
 	"github.com/status-im/keycard-go/apdu"
 	"github.com/status-im/keycard-go/derivationpath"
 	ktypes "github.com/status-im/keycard-go/types"
+	"github.com/status-im/status-keycard-go/internal"
 )
 
-func (f *KeycardFlow) factoryReset(kc *keycardContext) error {
-	err := kc.factoryReset(true)
+func (f *KeycardFlow) factoryReset(kc *internal.KeycardContext) error {
+	err := kc.FactoryReset(true)
 
 	if err == nil {
 		delete(f.params, FactoryReset)
 		return restartErr()
-	} else if isSCardError(err) {
+	} else if internal.IsSCardError(err) {
 		return restartErr()
 	} else {
 		return err
 	}
 }
 
-func (f *KeycardFlow) selectKeycard(kc *keycardContext) error {
-	appInfo, err := kc.selectApplet()
+func (f *KeycardFlow) selectKeycard(kc *internal.KeycardContext) error {
+	appInfo, err := kc.SelectApplet()
 
 	if err != nil {
 		return restartErr()
 	}
 
-	f.cardInfo.instanceUID = btox(appInfo.InstanceUID)
-	f.cardInfo.keyUID = btox(appInfo.KeyUID)
-	f.cardInfo.freeSlots = bytesToInt(appInfo.AvailableSlots)
+	f.cardInfo.instanceUID = internal.Btox(appInfo.InstanceUID)
+	f.cardInfo.keyUID = internal.Btox(appInfo.KeyUID)
+	f.cardInfo.freeSlots = internal.BytesToInt(appInfo.AvailableSlots)
 
 	if !appInfo.Installed {
-		return f.pauseAndRestart(SwapCard, ErrorNotAKeycard)
+		return f.pauseAndRestart(SwapCard, internal.ErrorNotAKeycard)
 	}
 
 	if requiredInstanceUID, ok := f.params[InstanceUID]; ok {
@@ -53,7 +54,7 @@ func (f *KeycardFlow) selectKeycard(kc *keycardContext) error {
 	return nil
 }
 
-func (f *KeycardFlow) pair(kc *keycardContext) error {
+func (f *KeycardFlow) pair(kc *internal.KeycardContext) error {
 	if f.cardInfo.freeSlots == 0 {
 		return f.pauseAndRestart(SwapCard, FreeSlots)
 	}
@@ -64,17 +65,17 @@ func (f *KeycardFlow) pair(kc *keycardContext) error {
 		pairingPass = DefPairing
 	}
 
-	pairing, err := kc.pair(pairingPass.(string))
+	pairing, err := kc.Pair(pairingPass.(string))
 
 	if err == nil {
-		return f.pairings.store(f.cardInfo.instanceUID, toPairInfo(pairing))
-	} else if isSCardError(err) {
+		return f.pairings.Store(f.cardInfo.instanceUID, internal.ToPairInfo(pairing))
+	} else if internal.IsSCardError(err) {
 		return restartErr()
 	}
 
 	delete(f.params, PairingPass)
 
-	err = f.pauseAndWait(EnterPairing, ErrorPairing)
+	err = f.pauseAndWait(EnterPairing, internal.ErrorPairing)
 
 	if err != nil {
 		return err
@@ -83,11 +84,11 @@ func (f *KeycardFlow) pair(kc *keycardContext) error {
 	return f.pair(kc)
 }
 
-func (f *KeycardFlow) initCard(kc *keycardContext) error {
+func (f *KeycardFlow) initCard(kc *internal.KeycardContext) error {
 	newPIN, pinOK := f.params[NewPIN]
 
 	if !pinOK {
-		err := f.pauseAndWait(EnterNewPIN, ErrorRequireInit)
+		err := f.pauseAndWait(EnterNewPIN, internal.ErrorRequireInit)
 		if err != nil {
 			return err
 		}
@@ -97,7 +98,7 @@ func (f *KeycardFlow) initCard(kc *keycardContext) error {
 
 	newPUK, pukOK := f.params[NewPUK]
 	if !pukOK {
-		err := f.pauseAndWait(EnterNewPUK, ErrorRequireInit)
+		err := f.pauseAndWait(EnterNewPUK, internal.ErrorRequireInit)
 		if err != nil {
 			return err
 		}
@@ -110,9 +111,9 @@ func (f *KeycardFlow) initCard(kc *keycardContext) error {
 		newPairing = DefPairing
 	}
 
-	err := kc.init(newPIN.(string), newPUK.(string), newPairing.(string))
+	err := kc.Init(newPIN.(string), newPUK.(string), newPairing.(string))
 
-	if isSCardError(err) {
+	if internal.IsSCardError(err) {
 		return restartErr()
 	} else if err != nil {
 		return err
@@ -127,20 +128,20 @@ func (f *KeycardFlow) initCard(kc *keycardContext) error {
 	return restartErr()
 }
 
-func (f *KeycardFlow) openSC(kc *keycardContext, giveup bool) error {
-	var pairing *PairingInfo
+func (f *KeycardFlow) openSC(kc *internal.KeycardContext, giveup bool) error {
+	var pairing *internal.PairingInfo
 
-	if !kc.cmdSet.ApplicationInfo.Initialized && !giveup {
+	if !kc.ApplicationInfo().Initialized && !giveup {
 		return f.initCard(kc)
 	} else {
-		pairing = f.pairings.get(f.cardInfo.instanceUID)
+		pairing = f.pairings.Get(f.cardInfo.instanceUID)
 	}
 
 	if pairing != nil {
-		err := kc.openSecureChannel(pairing.Index, pairing.Key)
+		err := kc.OpenSecureChannel(pairing.Index, pairing.Key)
 
 		if err == nil {
-			appStatus, err := kc.getStatusApplication()
+			appStatus, err := kc.GetStatusApplication()
 
 			if err != nil {
 				// getStatus can only fail for connection errors
@@ -151,11 +152,11 @@ func (f *KeycardFlow) openSC(kc *keycardContext, giveup bool) error {
 			f.cardInfo.pukRetries = appStatus.PUKRetryCount
 
 			return nil
-		} else if isSCardError(err) {
+		} else if internal.IsSCardError(err) {
 			return restartErr()
 		}
 
-		f.pairings.delete(f.cardInfo.instanceUID)
+		f.pairings.Delete(f.cardInfo.instanceUID)
 	}
 
 	if giveup {
@@ -171,7 +172,7 @@ func (f *KeycardFlow) openSC(kc *keycardContext, giveup bool) error {
 	return f.openSC(kc, giveup)
 }
 
-func (f *KeycardFlow) unblockPIN(kc *keycardContext) error {
+func (f *KeycardFlow) unblockPIN(kc *internal.KeycardContext) error {
 	if f.cardInfo.pukRetries == 0 {
 		return f.pauseAndRestart(SwapCard, PUKRetries)
 	}
@@ -183,18 +184,18 @@ func (f *KeycardFlow) unblockPIN(kc *keycardContext) error {
 	puk, pukOK := f.params[PUK]
 
 	if pinOK && pukOK {
-		err = kc.unblockPIN(puk.(string), newPIN.(string))
+		err = kc.UnblockPIN(puk.(string), newPIN.(string))
 
 		if err == nil {
-			f.cardInfo.pinRetries = maxPINRetries
-			f.cardInfo.pukRetries = maxPUKRetries
+			f.cardInfo.pinRetries = MaxPINRetries
+			f.cardInfo.pukRetries = MaxPUKRetries
 			f.params[PIN] = newPIN
 			delete(f.params, NewPIN)
 			delete(f.params, PUK)
 			return nil
-		} else if isSCardError(err) {
+		} else if internal.IsSCardError(err) {
 			return restartErr()
-		} else if leftRetries, ok := getRetries(err); ok {
+		} else if leftRetries, ok := internal.GetRetries(err); ok {
 			f.cardInfo.pukRetries = leftRetries
 			delete(f.params, PUK)
 			pukOK = false
@@ -210,7 +211,7 @@ func (f *KeycardFlow) unblockPIN(kc *keycardContext) error {
 	if !pukOK {
 		err = f.pauseAndWait(EnterPUK, pukError)
 	} else if !pinOK {
-		err = f.pauseAndWait(EnterNewPIN, ErrorUnblocking)
+		err = f.pauseAndWait(EnterNewPIN, internal.ErrorUnblocking)
 	}
 
 	if err != nil {
@@ -220,7 +221,7 @@ func (f *KeycardFlow) unblockPIN(kc *keycardContext) error {
 	return f.unblockPIN(kc)
 }
 
-func (f *KeycardFlow) authenticate(kc *keycardContext) error {
+func (f *KeycardFlow) authenticate(kc *internal.KeycardContext) error {
 	if f.cardInfo.pinRetries == 0 {
 		// succesful unblock leaves the card authenticated
 		return f.unblockPIN(kc)
@@ -229,14 +230,14 @@ func (f *KeycardFlow) authenticate(kc *keycardContext) error {
 	pinError := ""
 
 	if pin, ok := f.params[PIN]; ok {
-		err := kc.verifyPin(pin.(string))
+		err := kc.VerifyPin(pin.(string))
 
 		if err == nil {
-			f.cardInfo.pinRetries = maxPINRetries
+			f.cardInfo.pinRetries = MaxPINRetries
 			return nil
-		} else if isSCardError(err) {
+		} else if internal.IsSCardError(err) {
 			return restartErr()
-		} else if leftRetries, ok := getRetries(err); ok {
+		} else if leftRetries, ok := internal.GetRetries(err); ok {
 			f.cardInfo.pinRetries = leftRetries
 			delete(f.params, PIN)
 		}
@@ -257,7 +258,7 @@ func (f *KeycardFlow) authenticate(kc *keycardContext) error {
 	return f.authenticate(kc)
 }
 
-func (f *KeycardFlow) openSCAndAuthenticate(kc *keycardContext, giveup bool) error {
+func (f *KeycardFlow) openSCAndAuthenticate(kc *internal.KeycardContext, giveup bool) error {
 	err := f.openSC(kc, giveup)
 
 	if err != nil {
@@ -267,61 +268,61 @@ func (f *KeycardFlow) openSCAndAuthenticate(kc *keycardContext, giveup bool) err
 	return f.authenticate(kc)
 }
 
-func (f *KeycardFlow) unpairCurrent(kc *keycardContext) error {
-	err := kc.unpairCurrent()
+func (f *KeycardFlow) unpairCurrent(kc *internal.KeycardContext) error {
+	err := kc.UnpairCurrent()
 
-	if isSCardError(err) {
+	if internal.IsSCardError(err) {
 		return restartErr()
 	}
 
 	return err
 }
 
-func (f *KeycardFlow) unpair(kc *keycardContext, idx int) error {
-	err := kc.unpair(uint8(idx))
+func (f *KeycardFlow) unpair(kc *internal.KeycardContext, idx int) error {
+	err := kc.Unpair(uint8(idx))
 
-	if isSCardError(err) {
+	if internal.IsSCardError(err) {
 		return restartErr()
 	}
 
 	return err
 }
 
-func (f *KeycardFlow) removeKey(kc *keycardContext) error {
-	err := kc.removeKey()
+func (f *KeycardFlow) removeKey(kc *internal.KeycardContext) error {
+	err := kc.RemoveKey()
 
-	if isSCardError(err) {
+	if internal.IsSCardError(err) {
 		return restartErr()
 	}
 
 	return err
 }
 
-func (f *KeycardFlow) getMetadata(kc *keycardContext) (*Metadata, error) {
-	m, err := kc.getMetadata()
+func (f *KeycardFlow) getMetadata(kc *internal.KeycardContext) (*internal.Metadata, error) {
+	m, err := kc.GetMetadata()
 
 	if err == nil {
-		return toMetadata(m), nil
-	} else if isSCardError(err) {
+		return internal.ToMetadata(m), nil
+	} else if internal.IsSCardError(err) {
 		return nil, restartErr()
 	} else if serr, ok := err.(*apdu.ErrBadResponse); ok {
 		if serr.Sw == 0x6d00 {
-			return nil, errors.New(ErrorNoKeys)
+			return nil, errors.New(internal.ErrorNoKeys)
 		} else {
 			return nil, err
 		}
 	} else if err == io.EOF {
-		return nil, errors.New(ErrorNoData)
+		return nil, errors.New(internal.ErrorNoData)
 	} else {
 		return nil, err
 	}
 }
 
-func (f *KeycardFlow) storeMetadata(kc *keycardContext) error {
+func (f *KeycardFlow) storeMetadata(kc *internal.KeycardContext) error {
 	cardName, cardNameOK := f.params[CardName]
 
 	if !cardNameOK {
-		err := f.pauseAndWait(EnterName, ErrorStoreMeta)
+		err := f.pauseAndWait(EnterName, internal.ErrorStoreMeta)
 		if err != nil {
 			return err
 		}
@@ -332,7 +333,7 @@ func (f *KeycardFlow) storeMetadata(kc *keycardContext) error {
 	w, walletsOK := f.params[WalletPaths]
 
 	if !walletsOK {
-		err := f.pauseAndWait(EnterWallets, ErrorStoreMeta)
+		err := f.pauseAndWait(EnterWallets, internal.ErrorStoreMeta)
 		if err != nil {
 			return err
 		}
@@ -344,8 +345,8 @@ func (f *KeycardFlow) storeMetadata(kc *keycardContext) error {
 
 	paths := make([]uint32, len(wallets))
 	for i, p := range wallets {
-		if !strings.HasPrefix(p.(string), walletRoothPath) {
-			return errors.New("path must start with " + walletRoothPath)
+		if !strings.HasPrefix(p.(string), WalletRoothPath) {
+			return errors.New("path must start with " + WalletRoothPath)
 		}
 
 		_, components, err := derivationpath.Decode(p.(string))
@@ -361,26 +362,26 @@ func (f *KeycardFlow) storeMetadata(kc *keycardContext) error {
 		return err
 	}
 
-	err = kc.storeMetadata(m)
+	err = kc.StoreMetadata(m)
 
-	if isSCardError(err) {
+	if internal.IsSCardError(err) {
 		return restartErr()
 	}
 
 	return err
 }
 
-func (f *KeycardFlow) exportKey(kc *keycardContext, path string, onlyPublic bool) (*KeyPair, error) {
-	keyPair, err := kc.exportKey(true, path == masterPath, onlyPublic, path)
+func (f *KeycardFlow) exportKey(kc *internal.KeycardContext, path string, onlyPublic bool) (*internal.KeyPair, error) {
+	keyPair, err := kc.ExportKey(true, path == MasterPath, onlyPublic, path)
 
-	if isSCardError(err) {
+	if internal.IsSCardError(err) {
 		return nil, restartErr()
 	}
 
 	return keyPair, err
 }
 
-func (f *KeycardFlow) exportBIP44Key(kc *keycardContext) (interface{}, error) {
+func (f *KeycardFlow) exportBIP44Key(kc *internal.KeycardContext) (interface{}, error) {
 	if path, ok := f.params[BIP44Path]; ok {
 		exportPrivParam, ok := f.params[ExportPriv]
 		exportPrivate := (!ok || !exportPrivParam.(bool))
@@ -388,7 +389,7 @@ func (f *KeycardFlow) exportBIP44Key(kc *keycardContext) (interface{}, error) {
 		if pathStr, ok := path.(string); ok {
 			return f.exportKey(kc, pathStr, exportPrivate)
 		} else if paths, ok := path.([]interface{}); ok {
-			keys := make([]*KeyPair, len(paths))
+			keys := make([]*internal.KeyPair, len(paths))
 
 			for i, path := range paths {
 				key, err := f.exportKey(kc, path.(string), exportPrivate)
@@ -406,7 +407,7 @@ func (f *KeycardFlow) exportBIP44Key(kc *keycardContext) (interface{}, error) {
 		}
 	}
 
-	err := f.pauseAndWait(EnterPath, ErrorExporting)
+	err := f.pauseAndWait(EnterPath, internal.ErrorExporting)
 
 	if err != nil {
 		return nil, err
@@ -415,17 +416,17 @@ func (f *KeycardFlow) exportBIP44Key(kc *keycardContext) (interface{}, error) {
 	return f.exportBIP44Key(kc)
 }
 
-func (f *KeycardFlow) loadKeys(kc *keycardContext) error {
+func (f *KeycardFlow) loadKeys(kc *internal.KeycardContext) error {
 	if mnemonic, ok := f.params[Mnemonic]; ok {
-		keyUID, err := kc.loadMnemonic(mnemonic.(string), "")
+		keyUID, err := kc.LoadMnemonic(mnemonic.(string), "")
 
-		if isSCardError(err) {
+		if internal.IsSCardError(err) {
 			return restartErr()
 		} else if err != nil {
 			return err
 		}
 
-		f.cardInfo.keyUID = btox(keyUID)
+		f.cardInfo.keyUID = internal.Btox(keyUID)
 		return nil
 	}
 
@@ -438,21 +439,21 @@ func (f *KeycardFlow) loadKeys(kc *keycardContext) error {
 		case float64:
 			mnemonicLength = int(t)
 		default:
-			mnemonicLength = defMnemoLen
+			mnemonicLength = DefMnemoLen
 		}
 	} else {
-		mnemonicLength = defMnemoLen
+		mnemonicLength = DefMnemoLen
 	}
 
-	indexes, err := kc.generateMnemonic(mnemonicLength / 3)
+	indexes, err := kc.GenerateMnemonic(mnemonicLength / 3)
 
-	if isSCardError(err) {
+	if internal.IsSCardError(err) {
 		return restartErr()
 	} else if err != nil {
 		return err
 	}
 
-	err = f.pauseAndWaitWithStatus(EnterMnemonic, ErrorLoading, FlowParams{MnemonicIdxs: indexes})
+	err = f.pauseAndWaitWithStatus(EnterMnemonic, internal.ErrorLoading, FlowParams{MnemonicIdxs: indexes})
 
 	if err != nil {
 		return err
@@ -461,11 +462,11 @@ func (f *KeycardFlow) loadKeys(kc *keycardContext) error {
 	return f.loadKeys(kc)
 }
 
-func (f *KeycardFlow) changePIN(kc *keycardContext) error {
+func (f *KeycardFlow) changePIN(kc *internal.KeycardContext) error {
 	if newPIN, ok := f.params[NewPIN]; ok {
-		err := kc.changePin(newPIN.(string))
+		err := kc.ChangePin(newPIN.(string))
 
-		if isSCardError(err) {
+		if internal.IsSCardError(err) {
 			return restartErr()
 		} else if err != nil {
 			return err
@@ -474,7 +475,7 @@ func (f *KeycardFlow) changePIN(kc *keycardContext) error {
 		return nil
 	}
 
-	err := f.pauseAndWait(EnterNewPIN, ErrorChanging)
+	err := f.pauseAndWait(EnterNewPIN, internal.ErrorChanging)
 
 	if err != nil {
 		return err
@@ -483,11 +484,11 @@ func (f *KeycardFlow) changePIN(kc *keycardContext) error {
 	return f.changePIN(kc)
 }
 
-func (f *KeycardFlow) changePUK(kc *keycardContext) error {
+func (f *KeycardFlow) changePUK(kc *internal.KeycardContext) error {
 	if newPUK, ok := f.params[NewPUK]; ok {
-		err := kc.changePuk(newPUK.(string))
+		err := kc.ChangePuk(newPUK.(string))
 
-		if isSCardError(err) {
+		if internal.IsSCardError(err) {
 			return restartErr()
 		} else if err != nil {
 			return err
@@ -496,7 +497,7 @@ func (f *KeycardFlow) changePUK(kc *keycardContext) error {
 		return nil
 	}
 
-	err := f.pauseAndWait(EnterNewPUK, ErrorChanging)
+	err := f.pauseAndWait(EnterNewPUK, internal.ErrorChanging)
 
 	if err != nil {
 		return err
@@ -505,11 +506,11 @@ func (f *KeycardFlow) changePUK(kc *keycardContext) error {
 	return f.changePUK(kc)
 }
 
-func (f *KeycardFlow) changePairing(kc *keycardContext) error {
+func (f *KeycardFlow) changePairing(kc *internal.KeycardContext) error {
 	if newPairing, ok := f.params[NewPairing]; ok {
-		err := kc.changePairingPassword(newPairing.(string))
+		err := kc.ChangePairingPassword(newPairing.(string))
 
-		if isSCardError(err) {
+		if internal.IsSCardError(err) {
 			return restartErr()
 		} else if err != nil {
 			return err
@@ -518,7 +519,7 @@ func (f *KeycardFlow) changePairing(kc *keycardContext) error {
 		return nil
 	}
 
-	err := f.pauseAndWait(EnterNewPair, ErrorChanging)
+	err := f.pauseAndWait(EnterNewPair, internal.ErrorChanging)
 
 	if err != nil {
 		return err
@@ -527,13 +528,13 @@ func (f *KeycardFlow) changePairing(kc *keycardContext) error {
 	return f.changePairing(kc)
 }
 
-func (f *KeycardFlow) sign(kc *keycardContext) (*Signature, error) {
+func (f *KeycardFlow) sign(kc *internal.KeycardContext) (*internal.Signature, error) {
 	var err error
 
 	path, pathOK := f.params[BIP44Path]
 
 	if !pathOK {
-		err = f.pauseAndWait(EnterPath, ErrorSigning)
+		err = f.pauseAndWait(EnterPath, internal.ErrorSigning)
 		if err != nil {
 			return nil, err
 		}
@@ -546,14 +547,14 @@ func (f *KeycardFlow) sign(kc *keycardContext) (*Signature, error) {
 	var rawHash []byte
 
 	if hashOK {
-		rawHash, err = xtob(hash.(string))
+		rawHash, err = internal.Xtob(hash.(string))
 		if err != nil {
 			hashOK = false
 		}
 	}
 
 	if !hashOK {
-		err := f.pauseAndWait(EnterTXHash, ErrorSigning)
+		err := f.pauseAndWait(EnterTXHash, internal.ErrorSigning)
 		if err != nil {
 			return nil, err
 		}
@@ -561,13 +562,13 @@ func (f *KeycardFlow) sign(kc *keycardContext) (*Signature, error) {
 		return f.sign(kc)
 	}
 
-	signature, err := kc.signWithPath(rawHash, path.(string))
+	signature, err := kc.SignWithPath(rawHash, path.(string))
 
-	if isSCardError(err) {
+	if internal.IsSCardError(err) {
 		return nil, restartErr()
 	} else if err != nil {
 		return nil, err
 	}
 
-	return toSignature(signature), nil
+	return internal.ToSignature(signature), nil
 }

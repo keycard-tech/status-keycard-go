@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
-	skg "github.com/status-im/status-keycard-go"
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/pkg/flow"
 )
 
-var flow *skg.KeycardFlow
+var currentFlow *flow.KeycardFlow
 var finished chan (struct{})
 var correctPairing = "KeycardDefaultPairing"
 var correctPIN = "123456"
@@ -26,41 +26,41 @@ func signalHandler(j []byte) {
 
 	go func() {
 		switch sig.Type {
-		case skg.InsertCard:
+		case flow.InsertCard:
 			fmt.Print("Insert card\n")
-		case skg.CardInserted:
+		case flow.CardInserted:
 			fmt.Printf("Card inserted\n")
-		case skg.SwapCard:
+		case flow.SwapCard:
 			fmt.Printf("Swap card. Changing constraint\n")
-			flow.Resume(skg.FlowParams{skg.KeyUID: keyUID})
-		case skg.EnterPairing:
+			currentFlow.Resume(flow.FlowParams{flow.KeyUID: keyUID})
+		case flow.EnterPairing:
 			fmt.Printf("Entering pass: %+v\n", correctPairing)
-			flow.Resume(skg.FlowParams{skg.PairingPass: correctPairing})
-		case skg.EnterPIN:
+			currentFlow.Resume(flow.FlowParams{flow.PairingPass: correctPairing})
+		case flow.EnterPIN:
 			fmt.Printf("Entering PIN: %+v\n", correctPIN)
-			flow.Resume(skg.FlowParams{skg.PIN: correctPIN})
-		case skg.EnterNewPIN:
+			currentFlow.Resume(flow.FlowParams{flow.PIN: correctPIN})
+		case flow.EnterNewPIN:
 			fmt.Printf("Creating PIN: %+v\n", correctPIN)
-			flow.Resume(skg.FlowParams{skg.NewPIN: correctPIN})
-		case skg.EnterNewPUK:
+			currentFlow.Resume(flow.FlowParams{flow.NewPIN: correctPIN})
+		case flow.EnterNewPUK:
 			fmt.Printf("Creating PUK: %+v\n", correctPUK)
-			flow.Resume(skg.FlowParams{skg.NewPUK: correctPUK})
-		case skg.EnterNewPair:
+			currentFlow.Resume(flow.FlowParams{flow.NewPUK: correctPUK})
+		case flow.EnterNewPair:
 			fmt.Printf("Creating pairing: %+v\n", correctPairing)
-			flow.Resume(skg.FlowParams{skg.NewPairing: correctPairing})
-		case skg.EnterMnemonic:
+			currentFlow.Resume(flow.FlowParams{flow.NewPairing: correctPairing})
+		case flow.EnterMnemonic:
 			fmt.Printf("Loading mnemonic\n")
-			flow.Resume(skg.FlowParams{skg.Mnemonic: "receive fan copper bracket end train again sustain wet siren throw cigar"})
-		case skg.FlowResult:
+			currentFlow.Resume(flow.FlowParams{flow.Mnemonic: "receive fan copper bracket end train again sustain wet siren throw cigar"})
+		case flow.FlowResult:
 			fmt.Printf("Flow result: %+v\n", sig.Event)
 			close(finished)
 		}
 	}()
 }
 
-func testFlow(typ skg.FlowType, params skg.FlowParams) {
+func testFlow(typ flow.FlowType, params flow.FlowParams) {
 	finished = make(chan struct{})
-	err := flow.Start(typ, params)
+	err := currentFlow.Start(typ, params)
 
 	if err != nil {
 		fmt.Printf("error: %+v\n", err)
@@ -71,7 +71,7 @@ func testFlow(typ skg.FlowType, params skg.FlowParams) {
 
 func testRecoverAccount() {
 	finished = make(chan struct{})
-	err := flow.Start(skg.RecoverAccount, skg.FlowParams{})
+	err := currentFlow.Start(flow.RecoverAccount, flow.FlowParams{})
 
 	if err != nil {
 		fmt.Printf("error: %+v\n", err)
@@ -91,7 +91,7 @@ func main() {
 
 	pairingsFile := filepath.Join(dir, "keycard-pairings.json")
 
-	flow, err = skg.NewFlow(pairingsFile)
+	currentFlow, err = flow.NewFlow(pairingsFile)
 
 	if err != nil {
 		fmt.Printf("error: %+v\n", err)
@@ -100,18 +100,18 @@ func main() {
 
 	signal.SetKeycardSignalHandler(signalHandler)
 
-	testFlow(skg.GetAppInfo, skg.FlowParams{skg.FactoryReset: true})
-	testFlow(skg.LoadAccount, skg.FlowParams{skg.MnemonicLen: 12})
-	testFlow(skg.UnpairThis, skg.FlowParams{skg.PIN: correctPIN})
-	testFlow(skg.RecoverAccount, skg.FlowParams{skg.PairingPass: "WrongPass", skg.PIN: "234567"})
-	testFlow(skg.Login, skg.FlowParams{skg.KeyUID: "60a78c98d5dd659f714eb7072bfb2c0d8a65f74a8f6aff7bb27cf56ae1feec17"})
-	testFlow(skg.GetAppInfo, skg.FlowParams{})
-	testFlow(skg.ExportPublic, skg.FlowParams{skg.BIP44Path: "m/44'/60'/0'/0/1", skg.ExportMaster: true})
-	testFlow(skg.ExportPublic, skg.FlowParams{skg.BIP44Path: "m/43'/60'/1581'/1'/0", skg.ExportPriv: true})
-	testFlow(skg.ExportPublic, skg.FlowParams{skg.BIP44Path: []interface{}{"m/44'/60'/0'/0/2", "m/44'/60'/0'/0/3", "m/44'/60'/0'/0/4"}})
-	testFlow(skg.Sign, skg.FlowParams{skg.TXHash: "60a78c98d5dd659f714eb7072bfb2c0d8a65f74a8f6aff7bb27cf56ae1feec17", skg.BIP44Path: "m/44'/60'/0'/0/0"})
-	testFlow(skg.StoreMetadata, skg.FlowParams{skg.CardName: "TestCard", skg.WalletPaths: []interface{}{"m/44'/60'/0'/0/0", "m/44'/60'/0'/0/1", "m/44'/60'/0'/0/5", "m/44'/60'/0'/0/6"}})
-	testFlow(skg.GetMetadata, skg.FlowParams{})
-	testFlow(skg.GetMetadata, skg.FlowParams{skg.ResolveAddr: true})
-	testFlow(skg.UnpairThis, skg.FlowParams{skg.PIN: correctPIN})
+	testFlow(flow.GetAppInfo, flow.FlowParams{flow.FactoryReset: true})
+	testFlow(flow.LoadAccount, flow.FlowParams{flow.MnemonicLen: 12})
+	testFlow(flow.UnpairThis, flow.FlowParams{flow.PIN: correctPIN})
+	testFlow(flow.RecoverAccount, flow.FlowParams{flow.PairingPass: "WrongPass", flow.PIN: "234567"})
+	testFlow(flow.Login, flow.FlowParams{flow.KeyUID: "60a78c98d5dd659f714eb7072bfb2c0d8a65f74a8f6aff7bb27cf56ae1feec17"})
+	testFlow(flow.GetAppInfo, flow.FlowParams{})
+	testFlow(flow.ExportPublic, flow.FlowParams{flow.BIP44Path: "m/44'/60'/0'/0/1", flow.ExportMaster: true})
+	testFlow(flow.ExportPublic, flow.FlowParams{flow.BIP44Path: "m/43'/60'/1581'/1'/0", flow.ExportPriv: true})
+	testFlow(flow.ExportPublic, flow.FlowParams{flow.BIP44Path: []interface{}{"m/44'/60'/0'/0/2", "m/44'/60'/0'/0/3", "m/44'/60'/0'/0/4"}})
+	testFlow(flow.Sign, flow.FlowParams{flow.TXHash: "60a78c98d5dd659f714eb7072bfb2c0d8a65f74a8f6aff7bb27cf56ae1feec17", flow.BIP44Path: "m/44'/60'/0'/0/0"})
+	testFlow(flow.StoreMetadata, flow.FlowParams{flow.CardName: "TestCard", flow.WalletPaths: []interface{}{"m/44'/60'/0'/0/0", "m/44'/60'/0'/0/1", "m/44'/60'/0'/0/5", "m/44'/60'/0'/0/6"}})
+	testFlow(flow.GetMetadata, flow.FlowParams{})
+	testFlow(flow.GetMetadata, flow.FlowParams{flow.ResolveAddr: true})
+	testFlow(flow.UnpairThis, flow.FlowParams{flow.PIN: correctPIN})
 }

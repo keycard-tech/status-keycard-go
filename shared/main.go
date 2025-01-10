@@ -9,15 +9,15 @@ import (
 	"errors"
 	"unsafe"
 
-	skg "github.com/status-im/status-keycard-go"
 	"github.com/status-im/status-keycard-go/signal"
+	"github.com/status-im/status-keycard-go/pkg/flow"
 )
 
 func main() {}
 
 var notAvailable = errors.New("not available in this context")
 
-var globalFlow *skg.KeycardFlow
+var globalFlow *flow.KeycardFlow
 
 func retErr(err error) *C.char {
 	if err == nil {
@@ -27,8 +27,8 @@ func retErr(err error) *C.char {
 	}
 }
 
-func jsonToParams(jsonParams *C.char) (skg.FlowParams, error) {
-	var params skg.FlowParams
+func jsonToParams(jsonParams *C.char) (flow.FlowParams, error) {
+	var params flow.FlowParams
 
 	if err := json.Unmarshal([]byte(C.GoString(jsonParams)), &params); err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func jsonToParams(jsonParams *C.char) (skg.FlowParams, error) {
 //export KeycardInitFlow
 func KeycardInitFlow(storageDir *C.char) *C.char {
 	var err error
-	globalFlow, err = skg.NewFlow(C.GoString(storageDir))
+	globalFlow, err = flow.NewFlow(C.GoString(storageDir))
 
 	return retErr(err)
 }
@@ -53,7 +53,7 @@ func KeycardStartFlow(flowType C.int, jsonParams *C.char) *C.char {
 		return retErr(err)
 	}
 
-	err = globalFlow.Start(skg.FlowType(flowType), params)
+	err = globalFlow.Start(flow.FlowType(flowType), params)
 	return retErr(err)
 }
 
