@@ -2,7 +2,6 @@ package internal
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 
 	"github.com/ebfe/scard"
 	keycard "github.com/status-im/keycard-go"
@@ -25,14 +24,6 @@ func GetRetries(err error) (int, bool) {
 	}
 }
 
-func Btox(bytes []byte) string {
-	return hex.EncodeToString(bytes)
-}
-
-func Xtob(str string) ([]byte, error) {
-	return hex.DecodeString(str)
-}
-
 func BytesToInt(s []byte) int {
 	if len(s) > 4 {
 		return 0
@@ -44,19 +35,15 @@ func BytesToInt(s []byte) int {
 }
 
 func ToAppInfo(r *ktypes.ApplicationInfo) ApplicationInfo {
+	if r == nil {
+		return ApplicationInfo{}
+	}
 	return ApplicationInfo{
 		Initialized:    r.Initialized,
 		InstanceUID:    r.InstanceUID,
 		Version:        BytesToInt(r.Version),
 		AvailableSlots: BytesToInt(r.AvailableSlots),
 		KeyUID:         r.KeyUID,
-	}
-}
-
-func ToPairInfo(r *ktypes.PairingInfo) *PairingInfo {
-	return &PairingInfo{
-		Key:   r.Key,
-		Index: r.Index,
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
 	"github.com/status-im/status-keycard-go/pkg/flow"
+	"github.com/status-im/status-keycard-go/pkg/utils"
 )
 
 func (mkf *MockedKeycardFlow) handleGetAppInfoFlow() {
@@ -63,15 +64,15 @@ func (mkf *MockedKeycardFlow) handleGetAppInfoFlow() {
 	}
 
 	keycardStoresKeys := mkf.insertedKeycard.InstanceUID != "" && mkf.insertedKeycard.KeyUID != ""
-	if len(enteredPIN) == flow.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin || !keycardStoresKeys {
+	if len(enteredPIN) == internal.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin || !keycardStoresKeys {
 		flowStatus[internal.ErrorKey] = internal.ErrorOK
 		flowStatus[flow.Paired] = keycardStoresKeys
 		flowStatus[flow.AppInfo] = internal.ApplicationInfo{
 			Initialized:    keycardStoresKeys,
-			InstanceUID:    internal.HexString(mkf.insertedKeycard.InstanceUID),
+			InstanceUID:    utils.HexString(mkf.insertedKeycard.InstanceUID),
 			Version:        123,
 			AvailableSlots: mkf.insertedKeycard.FreePairingSlots,
-			KeyUID:         internal.HexString(mkf.insertedKeycard.KeyUID),
+			KeyUID:         utils.HexString(mkf.insertedKeycard.KeyUID),
 		}
 		mkf.state = flow.Idle
 		signal.Send(flow.FlowResult, flowStatus)

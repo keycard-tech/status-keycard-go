@@ -56,8 +56,8 @@ func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
 		finalType = flow.SwapCard
 	} else {
 		if mkf.insertedKeycard.PinRetries == 0 {
-			if len(enteredPUK) == flow.DefPUKLen {
-				if len(enteredPIN) == flow.DefPINLen && enteredPIN == enteredNewPIN {
+			if len(enteredPUK) == internal.DefPUKLen {
+				if len(enteredPIN) == internal.DefPINLen && enteredPIN == enteredNewPIN {
 					if enteredPUK != mkf.insertedKeycard.Puk {
 						mkf.insertedKeycard.PukRetries--
 						if mkf.insertedKeycard.PukRetries == 0 {
@@ -77,7 +77,7 @@ func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
 				finalType = flow.EnterPUK
 			}
 		} else {
-			if len(enteredNewPIN) == 0 && len(enteredPIN) == flow.DefPINLen && enteredPIN != mkf.insertedKeycard.Pin {
+			if len(enteredNewPIN) == 0 && len(enteredPIN) == internal.DefPINLen && enteredPIN != mkf.insertedKeycard.Pin {
 				mkf.insertedKeycard.PinRetries--
 				flowStatus[internal.ErrorKey] = flow.PIN
 				finalType = flow.EnterPIN
@@ -89,20 +89,20 @@ func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
 		}
 	}
 
-	if mkf.insertedKeycard.PinRetries > 0 && len(enteredPIN) == flow.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin ||
-		mkf.insertedKeycard.PinRetries == 0 && mkf.insertedKeycard.PukRetries > 0 && len(enteredPUK) == flow.DefPUKLen &&
-			enteredPUK == mkf.insertedKeycard.Puk && len(enteredPIN) == flow.DefPINLen && enteredPIN == enteredNewPIN {
+	if mkf.insertedKeycard.PinRetries > 0 && len(enteredPIN) == internal.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin ||
+		mkf.insertedKeycard.PinRetries == 0 && mkf.insertedKeycard.PukRetries > 0 && len(enteredPUK) == internal.DefPUKLen &&
+			enteredPUK == mkf.insertedKeycard.Puk && len(enteredPIN) == internal.DefPINLen && enteredPIN == enteredNewPIN {
 
-		mkf.insertedKeycard.PinRetries = flow.MaxPINRetries
-		mkf.insertedKeycard.PukRetries = flow.MaxPUKRetries
+		mkf.insertedKeycard.PinRetries = internal.MaxPINRetries
+		mkf.insertedKeycard.PukRetries = internal.MaxPUKRetries
 		mkf.insertedKeycard.Pin = enteredPIN
 		flowStatus[internal.ErrorKey] = ""
-		flowStatus[flow.MasterKey] = mkf.insertedKeycardHelper.ExportedKey[flow.MasterPath]
-		flowStatus[flow.WalleRootKey] = mkf.insertedKeycardHelper.ExportedKey[flow.WalletRoothPath]
-		flowStatus[flow.WalletKey] = mkf.insertedKeycardHelper.ExportedKey[flow.WalletPath]
-		flowStatus[flow.EIP1581Key] = mkf.insertedKeycardHelper.ExportedKey[flow.Eip1581Path]
-		flowStatus[flow.WhisperKey] = mkf.insertedKeycardHelper.ExportedKey[flow.WhisperPath]
-		flowStatus[flow.EncKey] = mkf.insertedKeycardHelper.ExportedKey[flow.EncryptionPath]
+		flowStatus[flow.MasterKey] = mkf.insertedKeycardHelper.ExportedKey[internal.MasterPath]
+		flowStatus[flow.WalleRootKey] = mkf.insertedKeycardHelper.ExportedKey[internal.WalletRoothPath]
+		flowStatus[flow.WalletKey] = mkf.insertedKeycardHelper.ExportedKey[internal.WalletPath]
+		flowStatus[flow.EIP1581Key] = mkf.insertedKeycardHelper.ExportedKey[internal.Eip1581Path]
+		flowStatus[flow.WhisperKey] = mkf.insertedKeycardHelper.ExportedKey[internal.WhisperPath]
+		flowStatus[flow.EncKey] = mkf.insertedKeycardHelper.ExportedKey[internal.EncryptionPath]
 		mkf.state = flow.Idle
 		signal.Send(flow.FlowResult, flowStatus)
 		return

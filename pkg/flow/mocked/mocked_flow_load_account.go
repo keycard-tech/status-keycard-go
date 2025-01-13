@@ -51,10 +51,10 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 		case float64:
 			enteredMnemonicLength = int(t)
 		default:
-			enteredMnemonicLength = flow.DefMnemoLen
+			enteredMnemonicLength = internal.DefMnemoLen
 		}
 	} else {
-		enteredMnemonicLength = flow.DefMnemoLen
+		enteredMnemonicLength = internal.DefMnemoLen
 	}
 	if v, ok := mkf.params[flow.Mnemonic]; ok {
 		enteredMnemonic = v.(string)
@@ -81,7 +81,7 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 		return
 	}
 
-	if len(enteredPIN) == flow.DefPINLen && enteredPIN == enteredNewPIN && len(enteredNewPUK) == flow.DefPUKLen {
+	if len(enteredPIN) == internal.DefPINLen && enteredPIN == enteredNewPIN && len(enteredNewPUK) == internal.DefPUKLen {
 		if overwrite && enteredMnemonic == "" {
 
 			if mkf.insertedKeycard.InstanceUID == "" {
@@ -114,9 +114,9 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 				mkf.insertedKeycard.KeyUID = mkf.insertedKeycardHelper.KeyUID
 				mkf.insertedKeycard.Pin = enteredPIN
 				mkf.insertedKeycard.Puk = enteredNewPUK
-				mkf.insertedKeycard.PinRetries = flow.MaxPINRetries
-				mkf.insertedKeycard.PukRetries = flow.MaxPUKRetries
-				mkf.insertedKeycard.FreePairingSlots = flow.MaxFreeSlots - 1
+				mkf.insertedKeycard.PinRetries = internal.MaxPINRetries
+				mkf.insertedKeycard.PukRetries = internal.MaxPUKRetries
+				mkf.insertedKeycard.FreePairingSlots = internal.MaxFreeSlots - 1
 
 				mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
 

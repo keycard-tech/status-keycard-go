@@ -66,8 +66,8 @@ func (mkf *MockedKeycardFlow) handleChangePinFlow() {
 		finalType = flow.SwapCard
 	} else {
 		if mkf.insertedKeycard.PinRetries == 0 {
-			if len(enteredPUK) == flow.DefPUKLen {
-				if len(enteredPIN) == flow.DefPINLen && enteredPIN == enteredNewPIN {
+			if len(enteredPUK) == internal.DefPUKLen {
+				if len(enteredPIN) == internal.DefPINLen && enteredPIN == enteredNewPIN {
 					if enteredPUK != mkf.insertedKeycard.Puk {
 						mkf.insertedKeycard.PukRetries--
 						if mkf.insertedKeycard.PukRetries == 0 {
@@ -87,7 +87,7 @@ func (mkf *MockedKeycardFlow) handleChangePinFlow() {
 				finalType = flow.EnterPUK
 			}
 		} else {
-			if len(enteredNewPIN) == 0 && len(enteredPIN) == flow.DefPINLen && enteredPIN != mkf.insertedKeycard.Pin {
+			if len(enteredNewPIN) == 0 && len(enteredPIN) == internal.DefPINLen && enteredPIN != mkf.insertedKeycard.Pin {
 				mkf.insertedKeycard.PinRetries--
 				flowStatus[internal.ErrorKey] = flow.PIN
 				finalType = flow.EnterPIN
@@ -100,19 +100,19 @@ func (mkf *MockedKeycardFlow) handleChangePinFlow() {
 	}
 
 	if len(enteredNewPIN) == 0 {
-		if mkf.insertedKeycard.PinRetries > 0 && len(enteredPIN) == flow.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin {
-			mkf.insertedKeycard.PinRetries = flow.MaxPINRetries
-			mkf.insertedKeycard.PukRetries = flow.MaxPUKRetries
+		if mkf.insertedKeycard.PinRetries > 0 && len(enteredPIN) == internal.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin {
+			mkf.insertedKeycard.PinRetries = internal.MaxPINRetries
+			mkf.insertedKeycard.PukRetries = internal.MaxPUKRetries
 			mkf.insertedKeycard.Pin = enteredPIN
 			flowStatus[internal.ErrorKey] = internal.ErrorChanging
 			finalType = flow.EnterNewPIN
 		}
 	} else {
-		if overwrite && len(enteredPIN) == flow.DefPINLen && enteredPIN == enteredNewPIN ||
-			mkf.insertedKeycard.PinRetries == 0 && mkf.insertedKeycard.PukRetries > 0 && len(enteredPUK) == flow.DefPUKLen &&
-				enteredPUK == mkf.insertedKeycard.Puk && len(enteredPIN) == flow.DefPINLen && enteredPIN == enteredNewPIN {
-			mkf.insertedKeycard.PinRetries = flow.MaxPINRetries
-			mkf.insertedKeycard.PukRetries = flow.MaxPUKRetries
+		if overwrite && len(enteredPIN) == internal.DefPINLen && enteredPIN == enteredNewPIN ||
+			mkf.insertedKeycard.PinRetries == 0 && mkf.insertedKeycard.PukRetries > 0 && len(enteredPUK) == internal.DefPUKLen &&
+				enteredPUK == mkf.insertedKeycard.Puk && len(enteredPIN) == internal.DefPINLen && enteredPIN == enteredNewPIN {
+			mkf.insertedKeycard.PinRetries = internal.MaxPINRetries
+			mkf.insertedKeycard.PukRetries = internal.MaxPUKRetries
 			mkf.insertedKeycard.Pin = enteredPIN
 			signal.Send(flow.FlowResult, flowStatus)
 			return
