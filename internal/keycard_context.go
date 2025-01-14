@@ -48,7 +48,7 @@ func (kc *KeycardContext) Transmit(apdu []byte) ([]byte, error) {
 	return rpdu, err
 }
 
-func StartKeycardContext(filepath string) (*KeycardContext, error) {
+func StartKeycardContext() (*KeycardContext, error) {
 	kc := &KeycardContext{
 		connected: make(chan (bool)),
 		command:   make(chan (commandType)),
