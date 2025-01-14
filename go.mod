@@ -1,8 +1,8 @@
 module github.com/status-im/status-keycard-go
 
-go 1.22.0
+go 1.21.0
 
-toolchain go1.23.2
+toolchain go1.21.8
 
 require (
 	github.com/ebfe/scard v0.0.0-20190212122703-c3d1b1916a95
