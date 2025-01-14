@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/keycard-go/types"
 	"github.com/pkg/errors"
 	"github.com/status-im/status-keycard-go/signal"
-	"sync"
 )
 
 const infiniteTimeout = -1
@@ -26,11 +25,7 @@ type KeycardContextV2 struct {
 	logger       *zap.Logger
 	pairings     *pairing.Store
 	status       *Status
-	readers      ReadersStates
 	activeReader string
-	activeCard   string
-	mutex        *sync.RWMutex
-	//readers      chan []string
 }
 
 func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error) {
@@ -46,12 +41,13 @@ func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error
 		logger:   zap.L().Named("keycard"),
 		pairings: pairingsStore,
 		status:   NewStatus(),
-		mutex:    &sync.RWMutex{},
 	}
 
 	err = kc.establishContext()
 	if err != nil {
 		kc.logger.Error("failed to establish context", zap.Error(err))
+		kc.status.State = NoPCSC
+		kc.publishStatus()
 		return nil, err
 	}
 
@@ -60,7 +56,7 @@ func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error
 	kc.forceScan = false
 
 	go kc.cardCommunicationRoutine(ctx)
-	go kc.monitor()
+	kc.monitor()
 
 	return kc, nil
 }
@@ -94,31 +90,40 @@ func (kc *KeycardContextV2) monitor() {
 	}
 
 	logger := kc.logger.Named("monitor")
-	defer kc.logger.Debug("monitor stopped")
 
-	for {
-		kc.monitorRoutine(logger)
-	}
+	go func() {
+		defer logger.Debug("monitor stopped")
+		// This goroutine will be stopped by cardCtx.Cancel()
+		for {
+			finish := kc.monitorRoutine(logger)
+			if finish {
+				return
+			}
+		}
+	}()
 }
 
-func (kc *KeycardContextV2) monitorRoutine(logger *zap.Logger) {
+func (kc *KeycardContextV2) monitorRoutine(logger *zap.Logger) bool {
 	// Get current readers list and state
 	readers, err := kc.getCurrentReadersState()
 	if err != nil {
 		logger.Error("failed to get readers state", zap.Error(err))
-		return
+		kc.status.Reset()
+		kc.status.State = InternalError
+		kc.publishStatus()
+		return false
 	}
 
-	logger.Debug("new readers list", zap.Any("available", readers))
+	logger.Debug("readers list updated", zap.Any("available", readers))
 
-	kc.mutex.Lock()
-	kc.readers = readers
-	kc.mutex.Unlock()
+	if readers.Empty() {
+		kc.status.State = WaitingForReader
+		kc.publishStatus()
+	}
 
-	err, _ = kc.scanReadersForKeycard(readers)
+	err = kc.scanReadersForKeycard(readers)
 	if err != nil {
 		logger.Error("failed to check readers", zap.Error(err))
-		// FIXME: simply continue?
 	}
 
 	// Wait for readers changes, including new readers
@@ -130,18 +135,17 @@ func (kc *KeycardContextV2) monitorRoutine(logger *zap.Logger) {
 	}
 	rs := append(readers, pnpReader)
 
-	// Wait for reader changes
 	err = kc.cardCtx.GetStatusChange(rs, infiniteTimeout)
 	if err == scard.ErrCancelled && !kc.forceScan {
 		// Shutdown requested
-		return
+		return true
 	}
 	if err != scard.ErrCancelled && err != nil {
 		kc.logger.Error("failed to get status change", zap.Error(err))
-		return
+		return false
 	}
 
-	kc.logger.Debug("readers changed", zap.Any("readers", rs))
+	return false
 }
 
 func (kc *KeycardContextV2) getCurrentReadersState() (ReadersStates, error) {
@@ -156,7 +160,7 @@ func (kc *KeycardContextV2) getCurrentReadersState() (ReadersStates, error) {
 		rs[i].CurrentState = scard.StateUnaware
 	}
 
-	if len(rs) == 0 {
+	if rs.Empty() {
 		return rs, nil
 	}
 
@@ -179,14 +183,17 @@ func (kc *KeycardContextV2) getCurrentReadersState() (ReadersStates, error) {
 	return knownReaders, nil
 }
 
-func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) (error, bool) {
+func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) error {
 	if !kc.forceScan &&
 		kc.activeReader != "" &&
 		readers.Contains(kc.activeReader) &&
 		readers.ReaderHasCard(kc.activeReader) {
-		// active reader is not selected yet or is still present
-		// no need to connect card
-		return nil, false
+		// active reader is not selected yet or is still present, no need to connect a card
+		return nil
+	}
+
+	if readers.Empty() {
+		return nil
 	}
 
 	kc.forceScan = false
@@ -195,43 +202,35 @@ func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) (error,
 	readerWithCardIndex, ok := readers.ReaderWithCardIndex()
 	if !ok {
 		kc.logger.Debug("no card found on any readers")
-		return nil, false
+		kc.status.State = WaitingForCard
+		kc.publishStatus()
+		return nil
 	}
 
 	kc.logger.Debug("card found", zap.Int("index", readerWithCardIndex))
 
-	err := kc.connectCard(readers[readerWithCardIndex].Reader)
-	if err != nil {
-		kc.logger.Error("failed to connect card", zap.Error(err))
-		//time.Sleep(500 * time.Millisecond)
-		return err, false
-	}
-
-	kc.logger.Debug("card connected")
-
-	err = kc.connectKeycard()
+	err := kc.connectKeycard(readers[readerWithCardIndex].Reader)
 	if err != nil {
 		kc.logger.Error("failed to connect keycard", zap.Error(err))
-		return err, false
+		kc.publishStatus()
+		return err
 	}
 
-	kc.logger.Info("keycard connected",
-		zap.Any("appInfo", kc.status.AppInfo),
-		zap.Any("appStatus", kc.status.AppStatus),
-	)
-
-	return nil, true
+	kc.publishStatus()
+	return nil
 }
 
-func (kc *KeycardContextV2) connectCard(reader string) error {
+func (kc *KeycardContextV2) connectKeycard(reader string) error {
 	card, err := kc.cardCtx.Connect(reader, scard.ShareShared, scard.ProtocolAny)
 	if err != nil {
-		return err
+		kc.status.State = ConnectionError
+		return errors.Wrap(err, "failed to connect to card")
 	}
 
 	_, err = card.Status()
 	if err != nil {
-		return err
+		kc.status.State = ConnectionError
+		return errors.Wrap(err, "failed to get card status")
 	}
 
 	kc.activeReader = reader
@@ -239,26 +238,28 @@ func (kc *KeycardContextV2) connectCard(reader string) error {
 	kc.c = io.NewNormalChannel(kc)
 	kc.cmdSet = keycard.NewCommandSet(kc.c)
 
-	return nil
-}
+	// Card connected, now check if this is a keycard
 
-func (kc *KeycardContextV2) connectKeycard() error {
 	info, err := kc.SelectApplet()
 	if err != nil {
-		kc.logger.Error("failed to select applet", zap.Error(err))
-		return err
+		kc.status.State = ConnectionError
+		return errors.Wrap(err, "failed to select applet")
 	}
+
+	kc.logger.Debug("card connected")
+	kc.status.State = ConnectingCard
+	kc.publishStatus()
 
 	//
 	// NOTE: copy of openSC
 	//
 
 	if !info.Installed {
-		return errors.New("not a keycard")
+		kc.status.State = NotKeycard
+		return errors.New("card is not a keycard")
 	}
 
-	appInfo := ToAppInfo(info)
-
+	appInfo := ToAppInfoV2(info)
 	pair := kc.pairings.Get(appInfo.InstanceUID.String())
 
 	if pair == nil {
@@ -271,37 +272,31 @@ func (kc *KeycardContextV2) connectKeycard() error {
 		pairingPassword := DefPairing
 		pairingInfo, err = kc.Pair(pairingPassword)
 		if err != nil {
-			kc.logger.Error("failed to pair", zap.Error(err))
-			//status.State = PairingError
-			return errors.New("pairing error")
+			kc.status.State = PairingError
+			return errors.Wrap(err, "failed to pair keycard")
 		}
 
 		pair = pairing.ToPairInfo(pairingInfo)
 		err = kc.pairings.Store(appInfo.InstanceUID.String(), pair)
 		if err != nil {
-			kc.logger.Error("failed to store pairing", zap.Error(err))
-			//status.State = PairingError
-			return errors.New("pairing error")
+			kc.status.State = InternalError
+			return errors.Wrap(err, "failed to store pairing")
 		}
 	}
 
 	err = kc.OpenSecureChannel(pair.Index, pair.Key)
 	if err != nil {
-		//logger.Error("failed to open secure channel", zap.Error(err))
+		kc.status.State = ConnectionError
 		return errors.Wrap(err, "failed to open secure channel")
 	}
 
 	appStatus, err := kc.GetStatusApplication()
 	if err != nil {
-		kc.logger.Error("failed to get application status", zap.Error(err))
+		kc.status.State = ConnectionError
 		return errors.Wrap(err, "failed to get application status")
 	}
 
-	kc.logger.Info("application status",
-		zap.Stringer("instanceUID", appInfo.InstanceUID),
-		zap.Any("appStatus", appStatus),
-	)
-
+	kc.status.State = Ready
 	kc.status.AppInfo = &appInfo
 	kc.status.AppStatus = appStatus
 
@@ -325,6 +320,11 @@ func (kc *KeycardContextV2) resetCardConnection(forceRescan bool) {
 	}
 }
 
+func (kc *KeycardContextV2) publishStatus() {
+	kc.logger.Info("status changed", zap.Any("status", kc.status))
+	signal.Send("status-changed", kc.status)
+}
+
 func (kc *KeycardContextV2) Stop() {
 	kc.forceScan = true
 	if kc.cardCtx != nil {
@@ -337,11 +337,6 @@ func (kc *KeycardContextV2) Stop() {
 	if kc.shutdown != nil {
 		kc.shutdown()
 	}
-}
-
-func (kc *KeycardContextV2) publishStatus() {
-	//kc.logger.Debug("status changed", zap.Any("status", kc.status))
-	signal.Send("status-changed", kc.status)
 }
 
 func (kc *KeycardContextV2) VerifyPIN(pin string) error {

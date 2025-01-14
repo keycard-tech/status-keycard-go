@@ -44,3 +44,7 @@ func (rs ReadersStates) ReaderHasCard(reader string) bool {
 	}
 	return false
 }
+
+func (rs ReadersStates) Empty() bool {
+	return len(rs) == 0
+}

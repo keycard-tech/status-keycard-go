@@ -7,26 +7,22 @@ import (
 type State string
 
 const (
-	Unknown              State = "unknown"
-	NoPCSC               State = "no-pcsc"
-	WaitingForReader     State = "no-reader"
-	NoCard               State = "no-card"
-	ConnectionError      State = "connection-error" // NOTE: Perhaps a good place for retry
-	NotKeycard           State = "not-a-keycard"
-	PairingError         State = "pairing-error"
-	WrongPairingPassword State = "wrong-pairing-password"
-	Ready                State = "ready"
+	UnknownReaderState State = "unknown"
+	NoPCSC             State = "no-pcsc"
+	InternalError      State = "internal-error"
+	WaitingForReader   State = "waiting-for-reader"
+	WaitingForCard     State = "waiting-for-card"
+	ConnectingCard     State = "connecting-card"
+	ConnectionError    State = "connection-error" // NOTE: Perhaps a good place for retry
+	NotKeycard         State = "not-keycard"
+	PairingError       State = "pairing-error"
+	Ready              State = "ready"
 )
 
 type Status struct {
-	// WARNING: Check if State is actually needed.
-	// 			With further data it's redundant for most states.
-	State State `json:"state"`
-
-	Readers      []string                 `json:"readers"`
-	CardInserted bool                     `json:"cardInserted"`
-	AppInfo      *ApplicationInfo         `json:"cardInfo"`
-	AppStatus    *types.ApplicationStatus `json:"appStatus"`
+	State     State                    `json:"state"`
+	AppInfo   *ApplicationInfoV2       `json:"keycardInfo"`
+	AppStatus *types.ApplicationStatus `json:"keycardStatus"`
 }
 
 func NewStatus() *Status {
@@ -36,9 +32,7 @@ func NewStatus() *Status {
 }
 
 func (s *Status) Reset() {
-	s.State = Unknown
-	s.Readers = []string{}
-	s.CardInserted = false
+	s.State = UnknownReaderState
 	s.AppInfo = nil
 	s.AppStatus = nil
 }

@@ -20,6 +20,17 @@ type ApplicationInfo struct {
 	KeyUID utils.HexString `json:"keyUID"`
 }
 
+// ApplicationInfoV2 is the same as ApplicationInfo but with a string version field.
+type ApplicationInfoV2 struct {
+	Initialized    bool            `json:"initialized"`
+	InstanceUID    utils.HexString `json:"instanceUID"`
+	Version        string          `json:"version"`
+	AvailableSlots int             `json:"availableSlots"`
+	// KeyUID is the sha256 of the master public key on the card.
+	// It's empty if the card doesn't contain any key.
+	KeyUID utils.HexString `json:"keyUID"`
+}
+
 type KeyPair struct {
 	Address    string          `json:"address"`
 	PublicKey  utils.HexString `json:"publicKey"`
