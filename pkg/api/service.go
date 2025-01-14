@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/status-im/status-keycard-go/internal"
 	"net/http"
+	"github.com/pkg/errors"
 )
 
 var GlobalKeycardService KeycardService
@@ -21,6 +22,11 @@ func (s *KeycardService) Start(r *http.Request, args *StartRequest, reply *struc
 	return err
 }
 
+func (s *KeycardService) Stop(r *http.Request, args *struct{}, reply *struct{}) error {
+	GlobalKeycardService.keycardContext.Stop()
+	return nil
+}
+
 type VerifyPINRequest struct {
 	PIN string `json:"pin"`
 }
@@ -30,7 +36,11 @@ type VerifyPINResponse struct {
 }
 
 func (s *KeycardService) VerifyPIN(r *http.Request, args *VerifyPINRequest, reply *VerifyPINResponse) error {
-	err := GlobalKeycardService.keycardContext.VerifyPin(args.PIN)
+	if GlobalKeycardService.keycardContext == nil {
+		return errors.New("keycard service not started")
+	}
+
+	err := GlobalKeycardService.keycardContext.VerifyPIN(args.PIN)
 	if err != nil {
 		return err
 	}

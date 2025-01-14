@@ -208,8 +208,8 @@ func (s *Server) addUnsupportedEndpoint(name string) {
 func (s *Server) RegisterMobileAPI() {
 	EndpointsWithRequest := map[string]func(string) interface{}{
 		//"/api/v2/Start":        api.Start,
-		"/api/v2/Stop":         api.Stop,
-		"/api/v2/SelectApplet": api.SelectApplet,
+		//"/api/v2/Stop":         api.Stop,
+		//"/api/v2/SelectApplet": api.SelectApplet,
 	}
 
 	for name, endpoint := range EndpointsWithRequest {

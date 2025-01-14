@@ -9,7 +9,7 @@ type State string
 const (
 	Unknown              State = "unknown"
 	NoPCSC               State = "no-pcsc"
-	NoReader             State = "no-reader"
+	WaitingForReader     State = "no-reader"
 	NoCard               State = "no-card"
 	ConnectionError      State = "connection-error" // NOTE: Perhaps a good place for retry
 	NotKeycard           State = "not-a-keycard"
