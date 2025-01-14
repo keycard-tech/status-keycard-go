@@ -16,11 +16,7 @@ import (
 
 const infiniteTimeout = -1
 const zeroTimeout = 0
-
-var pnpReader = scard.ReaderState{
-	Reader:       `\\?PnP?\Notification`,
-	CurrentState: scard.StateUnaware,
-}
+const pnpNotificationReader = `\\?PnP?\Notification`
 
 type KeycardContextV2 struct {
 	KeycardContext
@@ -59,12 +55,6 @@ func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error
 		return nil, err
 	}
 
-	err = kc.checkPnpFeature()
-	if err != nil {
-		kc.logger.Error("PnP notifications are not supported", zap.Error(err))
-		return nil, err
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	kc.shutdown = cancel
 	kc.forceScan = false
@@ -75,18 +65,27 @@ func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error
 	return kc, nil
 }
 
-func (kc *KeycardContextV2) checkPnpFeature() error {
-	rs := []scard.ReaderState{pnpReader}
-	err := kc.cardCtx.GetStatusChange(rs, 0)
-	if err != nil {
-		return errors.Wrap(err, "failed to get status change")
-	}
+func (kc *KeycardContext) cardCommunicationRoutine(ctx context.Context) {
+	// Communication with the keycard must be done in a fixed thread
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
-	if rs[0].EventState&scard.StateUnknown == 0 {
-		return nil
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case cmd := <-kc.command:
+			switch cmd {
+			case Transmit:
+				kc.rpdu, kc.runErr = kc.card.Transmit(kc.apdu)
+				kc.command <- Ack
+			case Close:
+				return
+			default:
+				break
+			}
+		}
 	}
-
-	return errors.New("PnP feature not supported")
 }
 
 func (kc *KeycardContextV2) monitor() {
@@ -96,10 +95,6 @@ func (kc *KeycardContextV2) monitor() {
 
 	logger := kc.logger.Named("monitor")
 	defer kc.logger.Debug("monitor stopped")
-
-	// Add special reader for waiting for new readers
-	// WARNING: Maybe need to ensure this feature is OS-supported:
-	// 			https://blog.apdu.fr/posts/2015/12/os-x-el-capitan-missing-feature/
 
 	for {
 		kc.monitorRoutine(logger)
@@ -127,6 +122,12 @@ func (kc *KeycardContextV2) monitorRoutine(logger *zap.Logger) {
 	}
 
 	// Wait for readers changes, including new readers
+	// https://blog.apdu.fr/posts/2024/08/improved-scardgetstatuschange-for-pnpnotification-special-reader/
+	// NOTE: The article states that MacOS is not supported, but works for me on MacOS 15.1.1 (24B91).
+	pnpReader := scard.ReaderState{
+		Reader:       pnpNotificationReader,
+		CurrentState: scard.StateUnaware,
+	}
 	rs := append(readers, pnpReader)
 
 	// Wait for reader changes
@@ -341,29 +342,6 @@ func (kc *KeycardContextV2) Stop() {
 func (kc *KeycardContextV2) publishStatus() {
 	//kc.logger.Debug("status changed", zap.Any("status", kc.status))
 	signal.Send("status-changed", kc.status)
-}
-
-func (kc *KeycardContext) cardCommunicationRoutine(ctx context.Context) {
-	// Communication with the keycard must be done in a fixed thread
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case cmd := <-kc.command:
-			switch cmd {
-			case Transmit:
-				kc.rpdu, kc.runErr = kc.card.Transmit(kc.apdu)
-				kc.command <- Ack
-			case Close:
-				return
-			default:
-				break
-			}
-		}
-	}
 }
 
 func (kc *KeycardContextV2) VerifyPIN(pin string) error {
