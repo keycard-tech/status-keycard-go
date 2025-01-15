@@ -15,8 +15,6 @@ import (
 	"github.com/status-im/status-keycard-go/pkg/api"
 	"go.uber.org/zap"
 	"encoding/json"
-	"github.com/gorilla/rpc"
-	gorillajson "github.com/gorilla/rpc/json"
 )
 
 type Server struct {
@@ -95,11 +93,9 @@ func (s *Server) Listen(address string) error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	rpcServer := rpc.NewServer()
-	rpcServer.RegisterCodec(gorillajson.NewCodec(), "application/json")
-	err = rpcServer.RegisterService(&api.GlobalKeycardService, "keycard")
+	rpcServer, err := api.CreateRPCServer()
 	if err != nil {
-		s.logger.Error("failed to register service", zap.Error(err))
+		s.logger.Error("failed to create PRC server", zap.Error(err))
 	}
 
 	s.mux = http.NewServeMux()

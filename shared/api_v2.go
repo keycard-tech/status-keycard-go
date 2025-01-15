@@ -5,6 +5,11 @@ import (
 	"encoding/json"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"net/http/httptest"
+	"io"
+	"fmt"
+	"bytes"
+	"github.com/gorilla/rpc"
 )
 
 type response struct {
@@ -61,4 +66,46 @@ func VerifyPIN(request string) string {
 	var reply api.VerifyPINResponse
 	err = api.GlobalKeycardService.VerifyPIN(nil, args, &reply)
 	return buildResponse(reply, err)
+}
+
+var globalRPCServer *rpc.Server
+
+//export InitializeRPC
+func InitializeRPC() string {
+	rpcServer, err := api.CreateRPCServer()
+	if err != nil {
+		return err.Error()
+	}
+	globalRPCServer = rpcServer
+	return ""
+}
+
+//export CallRPC
+func CallRPC(payload string) string {
+	if globalRPCServer == nil {
+		return "RPC server not initialized"
+	}
+
+	payloadBytes := []byte(payload)
+
+	// Create a fake HTTP request
+	req := httptest.NewRequest("POST", "/rpc", bytes.NewBuffer(payloadBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create a fake HTTP response writer
+	rr := httptest.NewRecorder()
+
+	// Call the server's ServeHTTP method
+	globalRPCServer.ServeHTTP(rr, req)
+
+	// Read and return the response body
+	resp := rr.Result()
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Sprintf("Error reading response: %v", err)
+	}
+
+	return string(body)
 }
