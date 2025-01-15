@@ -1,5 +1,6 @@
 package main
 
+import "C"
 import (
 	"github.com/status-im/status-keycard-go/pkg/api"
 	"encoding/json"
@@ -70,23 +71,37 @@ func VerifyPIN(request string) string {
 
 var globalRPCServer *rpc.Server
 
-//export InitializeRPC
-func InitializeRPC() string {
+//export KeycardInitializeRPC
+func KeycardInitializeRPC() *C.char {
+	zap.L().Info("Initializing RPC server - 1")
+
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		fmt.Printf("failed to initialize log: %v\n", err)
+	}
+	zap.ReplaceGlobals(logger)
+
+	zap.L().Info("Initializing RPC server - 2")
+
 	rpcServer, err := api.CreateRPCServer()
 	if err != nil {
-		return err.Error()
+		return C.CString(err.Error())
 	}
 	globalRPCServer = rpcServer
-	return ""
+	logger.Info("RPC server initialized")
+	return C.CString("")
 }
 
-//export CallRPC
-func CallRPC(payload string) string {
+//export KeycardCallRPC
+func KeycardCallRPC(payload *C.char) *C.char {
+	logger := zap.L().Named("KeycardCallRPC")
+	logger.Debug("KeycardCallRPC", zap.String("payload", C.GoString(payload)))
+
 	if globalRPCServer == nil {
-		return "RPC server not initialized"
+		return C.CString("RPC server not initialized")
 	}
 
-	payloadBytes := []byte(payload)
+	payloadBytes := []byte(C.GoString(payload))
 
 	// Create a fake HTTP request
 	req := httptest.NewRequest("POST", "/rpc", bytes.NewBuffer(payloadBytes))
@@ -103,9 +118,10 @@ func CallRPC(payload string) string {
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
+	logger.Debug("KeycardCallRPC response", zap.String("body", string(body)))
 	if err != nil {
-		return fmt.Sprintf("Error reading response: %v", err)
+		return C.CString(fmt.Sprintf("Error reading response: %v", err))
 	}
 
-	return string(body)
+	return C.CString(string(body))
 }
