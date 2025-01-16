@@ -65,6 +65,16 @@ func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error
 	return kc, nil
 }
 
+func (kc *KeycardContext) establishContext() error {
+	cardCtx, err := scard.EstablishContext()
+	if err != nil {
+		return errors.New(ErrorPCSC)
+	}
+
+	kc.cardCtx = cardCtx
+	return nil
+}
+
 func (kc *KeycardContext) cardCommunicationRoutine(ctx context.Context) {
 	// Communication with the keycard must be done in a fixed thread
 	runtime.LockOSThread()
