@@ -7,6 +7,7 @@ import (
 	keycard "github.com/status-im/keycard-go"
 	"github.com/status-im/keycard-go/derivationpath"
 	ktypes "github.com/status-im/keycard-go/types"
+	"fmt"
 )
 
 func IsSCardError(err error) bool {
@@ -52,6 +53,29 @@ func ToAppInfo(r *ktypes.ApplicationInfo) ApplicationInfo {
 		Initialized:    r.Initialized,
 		InstanceUID:    r.InstanceUID,
 		Version:        BytesToInt(r.Version),
+		AvailableSlots: BytesToInt(r.AvailableSlots),
+		KeyUID:         r.KeyUID,
+	}
+}
+
+func ParseVersion(input []byte) string {
+	if len(input) != 2 {
+		return "unexpected version format"
+	}
+
+	major := input[0]
+	minor := input[1]
+	return fmt.Sprintf("%d.%d", major, minor)
+}
+
+func ToAppInfoV2(r *ktypes.ApplicationInfo) ApplicationInfoV2 {
+	if r == nil {
+		return ApplicationInfoV2{}
+	}
+	return ApplicationInfoV2{
+		Initialized:    r.Initialized,
+		InstanceUID:    r.InstanceUID,
+		Version:        ParseVersion(r.Version),
 		AvailableSlots: BytesToInt(r.AvailableSlots),
 		KeyUID:         r.KeyUID,
 	}
