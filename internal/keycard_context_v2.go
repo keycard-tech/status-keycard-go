@@ -17,6 +17,10 @@ const infiniteTimeout = -1
 const zeroTimeout = 0
 const pnpNotificationReader = `\\?PnP?\Notification`
 
+var (
+	errKeycardNotConnected = errors.New("keycard not connected")
+)
+
 type KeycardContextV2 struct {
 	KeycardContext
 
@@ -339,20 +343,59 @@ func (kc *KeycardContextV2) Stop() {
 	}
 }
 
-func (kc *KeycardContextV2) VerifyPIN(pin string) error {
-	if kc.cmdSet == nil {
-		return errors.New("keycard not connected")
-	}
+func (kc *KeycardContextV2) keycardConnected() bool {
+	return kc.cmdSet != nil
+}
 
-	err := kc.cmdSet.VerifyPIN(pin)
+func (kc *KeycardContextV2) checkSCardError(err error, context string) error {
 	if err == nil {
 		return nil
 	}
 
 	if IsSCardError(err) {
-		kc.logger.Error("failed to verify pin", zap.Error(err))
+		kc.logger.Error("command failed, resetting connection",
+			zap.String("context", context),
+			zap.Error(err))
 		kc.resetCardConnection(true)
 	}
 
 	return err
+}
+
+func (kc *KeycardContextV2) InitializeKeycard(pin, puk, pairingPassword string) error {
+	if !kc.keycardConnected() {
+		return errKeycardNotConnected
+	}
+
+	secrets := keycard.NewSecrets(pin, puk, pairingPassword)
+	err := kc.cmdSet.Init(secrets)
+	return kc.checkSCardError(err, "Init")
+}
+
+func (kc *KeycardContextV2) VerifyPIN(pin string) error {
+	if !kc.keycardConnected() {
+		return errKeycardNotConnected
+	}
+
+	err := kc.cmdSet.VerifyPIN(pin)
+	return kc.checkSCardError(err, "VerifyPIN")
+}
+
+func (kc *KeycardContextV2) GenerateMnemonic(mnemonicLength int) ([]int, error) {
+	if !kc.keycardConnected() {
+		return nil, errKeycardNotConnected
+	}
+
+	indexes, err := kc.cmdSet.GenerateMnemonic(mnemonicLength / 3)
+	return indexes, kc.checkSCardError(err, "GenerateMnemonic")
+}
+
+func (kc *KeycardContextV2) LoadMnemonic(mnemonic string, password string) ([]byte, error) {
+	if !kc.keycardConnected() {
+		return nil, errKeycardNotConnected
+	}
+
+	seed := kc.mnemonicToBinarySeed(mnemonic, password)
+	keyUID, err := kc.loadSeed(seed)
+	return keyUID, kc.checkSCardError(err, "LoadMnemonic")
 }

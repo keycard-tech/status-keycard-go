@@ -5,6 +5,10 @@ import (
 	"github.com/gorilla/rpc"
 )
 
+var (
+	globalKeycardService KeycardService
+)
+
 func CreateRPCServer() (*rpc.Server, error) {
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(gorillajson.NewCodec(), "application/json")

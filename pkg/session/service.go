@@ -3,9 +3,12 @@ package session
 import (
 	"github.com/status-im/status-keycard-go/internal"
 	"github.com/pkg/errors"
+	"github.com/status-im/status-keycard-go/pkg/utils"
 )
 
-var globalKeycardService KeycardService
+var (
+	errKeycardServiceNotStarted = errors.New("keycard service not started")
+)
 
 type KeycardService struct {
 	keycardContext *internal.KeycardContextV2
@@ -17,13 +20,33 @@ type StartRequest struct {
 
 func (s *KeycardService) Start(args *StartRequest, reply *struct{}) error {
 	var err error
-	globalKeycardService.keycardContext, err = internal.NewKeycardContextV2(args.StorageFilePath)
+	s.keycardContext, err = internal.NewKeycardContextV2(args.StorageFilePath)
 	return err
 }
 
 func (s *KeycardService) Stop(args *struct{}, reply *struct{}) error {
-	globalKeycardService.keycardContext.Stop()
+	s.keycardContext.Stop()
+	s.keycardContext = nil
 	return nil
+}
+
+type InitializeKeycardRequest struct {
+	PIN             string `json:"pin"`
+	PUK             string `json:"puk"`
+	PairingPassword string `json:"pairingPassword"`
+}
+
+func (s *KeycardService) InitializeKeycard(args *InitializeKeycardRequest, reply *struct{}) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	if args.PairingPassword == "" {
+		args.PairingPassword = internal.DefPairing
+	}
+
+	err := s.keycardContext.InitializeKeycard(args.PIN, args.PUK, args.PairingPassword)
+	return err
 }
 
 type VerifyPINRequest struct {
@@ -31,18 +54,85 @@ type VerifyPINRequest struct {
 }
 
 type VerifyPINResponse struct {
-	Success bool `json:"success"`
+	PINCorrect bool `json:"pinCorrect"`
 }
 
 func (s *KeycardService) VerifyPIN(args *VerifyPINRequest, reply *VerifyPINResponse) error {
-	if globalKeycardService.keycardContext == nil {
-		return errors.New("keycard service not started")
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
 	}
 
-	err := globalKeycardService.keycardContext.VerifyPIN(args.PIN)
+	err := s.keycardContext.VerifyPIN(args.PIN)
 	if err != nil {
 		return err
 	}
-	reply.Success = true
+	reply.PINCorrect = true
 	return nil
 }
+
+type GenerateSeedPhraseRequest struct {
+	Length int `json:"length"`
+}
+
+type GenerateSeedPhraseResponse struct {
+	Indexes []int `json:"indexes"`
+}
+
+func (s *KeycardService) GenerateSeedPhrase(args *GenerateSeedPhraseRequest, reply *GenerateSeedPhraseResponse) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	indexes, err := s.keycardContext.GenerateMnemonic(args.Length)
+	if err != nil {
+		return err
+	}
+	reply.Indexes = indexes
+	return nil
+}
+
+type LoadMnemonicRequest struct {
+	Mnemonic   string `json:"mnemonic"`
+	Passphrase string `json:"passphrase"`
+}
+
+type LoadMnemonicResponse struct {
+	KeyUID string `json:"keyUID"` // WARNING: Is this what's returned?
+}
+
+func (s *KeycardService) LoadMnemonic(args *LoadMnemonicRequest, reply *LoadMnemonicResponse) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	keyUID, err := s.keycardContext.LoadMnemonic(args.Mnemonic, args.Passphrase)
+	if err != nil {
+		reply.KeyUID = utils.Btox(keyUID)
+	}
+
+	return err
+}
+
+//func (s *KeycardService) FactoryReset() {
+//
+//}
+//
+//func (s *KeycardService) ChangePIN() {
+//
+//}
+//
+//func (s *KeycardService) HasPUK() {
+//
+//}
+//
+//func (s *KeycardService) ChangePUK() {
+//
+//}
+//
+//func (s *KeycardService) UnblockWithPUK() {
+//
+//}
+//
+//func (s *KeycardService) UnblockWithSeedPhrase() {
+//	// Perhaps FactoryReset + InitializeKeycard
+//}

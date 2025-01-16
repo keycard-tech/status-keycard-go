@@ -163,8 +163,16 @@ func (kc *KeycardContext) loadSeed(seed []byte) ([]byte, error) {
 	return pubKey, nil
 }
 
+func (kc *KeycardContext) mnemonicToBinarySeed(mnemonic string, password string) []byte {
+	return pbkdf2.Key(
+		norm.NFKD.Bytes([]byte(mnemonic)),
+		norm.NFKD.Bytes([]byte(bip39Salt+password)),
+		2048, 64, sha512.New,
+	)
+}
+
 func (kc *KeycardContext) LoadMnemonic(mnemonic string, password string) ([]byte, error) {
-	seed := pbkdf2.Key(norm.NFKD.Bytes([]byte(mnemonic)), norm.NFKD.Bytes([]byte(bip39Salt+password)), 2048, 64, sha512.New)
+	seed := kc.mnemonicToBinarySeed(mnemonic, password)
 	return kc.loadSeed(seed)
 }
 
