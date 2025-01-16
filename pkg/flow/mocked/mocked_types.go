@@ -2,7 +2,7 @@ package mocked
 
 import (
 	"github.com/status-im/status-keycard-go/internal"
-	"github.com/status-im/status-keycard-go/pkg/flow"
+	"github.com/status-im/status-keycard-go/pkg/pairing"
 )
 
 type MockedReaderState int
@@ -26,7 +26,7 @@ const (
 )
 
 type MockedKeycard struct {
-	PairingInfo      *internal.PairingInfo       `json:"pairing-info"`
+	PairingInfo      *pairing.Info               `json:"pairing-info"`
 	NotStatusKeycard bool                        `json:"not-status-keycard"`
 	InstanceUID      string                      `json:"instance-uid"`
 	KeyUID           string                      `json:"key-uid"`
@@ -43,12 +43,12 @@ type MockedKeycard struct {
 var mockedKeycard = MockedKeycard{
 	InstanceUID:      "00000000000000000000001234567890",
 	KeyUID:           "0000000000000000000000000000000000000000000000000000001234567890",
-	FreePairingSlots: flow.MaxFreeSlots - 1,
-	PinRetries:       flow.MaxPINRetries,
-	PukRetries:       flow.MaxPUKRetries,
+	FreePairingSlots: internal.MaxFreeSlots - 1,
+	PinRetries:       internal.MaxPINRetries,
+	PukRetries:       internal.MaxPUKRetries,
 	Pin:              "111111",
 	Puk:              "111111111111",
-	PairingInfo: &internal.PairingInfo{
+	PairingInfo: &pairing.Info{
 		Key:   []byte("0000000000000000000000000000000000000000000000000000001111111111"),
 		Index: 0,
 	},
@@ -72,12 +72,12 @@ var mockedKeycard = MockedKeycard{
 var mockedKeycardHelper = MockedKeycard{
 	InstanceUID:      "00000000000000000000001234567890",
 	KeyUID:           "0000000000000000000000000000000000000000000000000000001234567890",
-	FreePairingSlots: flow.MaxFreeSlots - 1,
-	PinRetries:       flow.MaxPINRetries,
-	PukRetries:       flow.MaxPUKRetries,
+	FreePairingSlots: internal.MaxFreeSlots - 1,
+	PinRetries:       internal.MaxPINRetries,
+	PukRetries:       internal.MaxPUKRetries,
 	Pin:              "111111",
 	Puk:              "111111111111",
-	PairingInfo: &internal.PairingInfo{
+	PairingInfo: &pairing.Info{
 		Key:   []byte("0000000000000000000000000000000000000000000000000000001111111111"),
 		Index: 0,
 	},

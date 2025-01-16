@@ -40,7 +40,7 @@ func (mkf *MockedKeycardFlow) handleStoreMetadataFlow() {
 		enteredCardName = v.(string)
 	}
 
-	if len(enteredPIN) == flow.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin && enteredCardName != "" {
+	if len(enteredPIN) == internal.DefPINLen && enteredPIN == mkf.insertedKeycard.Pin && enteredCardName != "" {
 		mkf.insertedKeycard.Metadata.Name = enteredCardName
 		mkf.insertedKeycard.Metadata.Wallets = []internal.Wallet{}
 
@@ -48,8 +48,8 @@ func (mkf *MockedKeycardFlow) handleStoreMetadataFlow() {
 			wallets := v.([]interface{})
 
 			for i, p := range wallets {
-				if !strings.HasPrefix(p.(string), flow.WalletRoothPath) {
-					panic("path must start with " + flow.WalletRoothPath)
+				if !strings.HasPrefix(p.(string), internal.WalletRoothPath) {
+					panic("path must start with " + internal.WalletRoothPath)
 				}
 
 				tmpWallet := internal.Wallet{
@@ -82,7 +82,7 @@ func (mkf *MockedKeycardFlow) handleStoreMetadataFlow() {
 		return
 	}
 
-	if len(enteredPIN) != flow.DefPINLen || enteredPIN != mkf.insertedKeycard.Pin {
+	if len(enteredPIN) != internal.DefPINLen || enteredPIN != mkf.insertedKeycard.Pin {
 		finalType = flow.EnterPIN
 	} else if enteredCardName == "" {
 		finalType = flow.EnterName

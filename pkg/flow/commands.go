@@ -5,12 +5,14 @@ import (
 	"io"
 	"strings"
 
-	keycard "github.com/status-im/keycard-go"
+	"github.com/status-im/keycard-go"
 	"github.com/status-im/keycard-go/apdu"
 	"github.com/status-im/keycard-go/derivationpath"
 	ktypes "github.com/status-im/keycard-go/types"
 
 	"github.com/status-im/status-keycard-go/internal"
+	"github.com/status-im/status-keycard-go/pkg/pairing"
+	"github.com/status-im/status-keycard-go/pkg/utils"
 )
 
 func (f *KeycardFlow) factoryReset(kc *internal.KeycardContext) error {
@@ -33,8 +35,8 @@ func (f *KeycardFlow) selectKeycard(kc *internal.KeycardContext) error {
 		return restartErr()
 	}
 
-	f.cardInfo.instanceUID = internal.Btox(appInfo.InstanceUID)
-	f.cardInfo.keyUID = internal.Btox(appInfo.KeyUID)
+	f.cardInfo.instanceUID = utils.Btox(appInfo.InstanceUID)
+	f.cardInfo.keyUID = utils.Btox(appInfo.KeyUID)
 	f.cardInfo.freeSlots = internal.BytesToInt(appInfo.AvailableSlots)
 	f.cardInfo.version = internal.BytesToInt(appInfo.Version)
 
@@ -65,13 +67,13 @@ func (f *KeycardFlow) pair(kc *internal.KeycardContext) error {
 	pairingPass, ok := f.params[PairingPass]
 
 	if !ok {
-		pairingPass = DefPairing
+		pairingPass = internal.DefPairing
 	}
 
-	pairing, err := kc.Pair(pairingPass.(string))
+	pair, err := kc.Pair(pairingPass.(string))
 
 	if err == nil {
-		return f.pairings.Store(f.cardInfo.instanceUID, internal.ToPairInfo(pairing))
+		return f.pairings.Store(f.cardInfo.instanceUID, pairing.ToPairInfo(pair))
 	} else if internal.IsSCardError(err) {
 		return restartErr()
 	}
@@ -111,7 +113,7 @@ func (f *KeycardFlow) initCard(kc *internal.KeycardContext) error {
 
 	newPairing, pairingOK := f.params[NewPairing]
 	if !pairingOK {
-		newPairing = DefPairing
+		newPairing = internal.DefPairing
 	}
 
 	err := kc.Init(newPIN.(string), newPUK.(string), newPairing.(string))
@@ -146,7 +148,7 @@ func (f *KeycardFlow) verifyAuthenticity(kc *internal.KeycardContext) error {
 }
 
 func (f *KeycardFlow) openSC(kc *internal.KeycardContext, giveup bool) error {
-	var pairing *internal.PairingInfo
+	var pairing *pairing.Info
 
 	if !kc.ApplicationInfo().Initialized && !giveup {
 		return f.initCard(kc)
@@ -210,8 +212,8 @@ func (f *KeycardFlow) unblockPIN(kc *internal.KeycardContext) error {
 		err = kc.UnblockPIN(puk.(string), newPIN.(string))
 
 		if err == nil {
-			f.cardInfo.pinRetries = MaxPINRetries
-			f.cardInfo.pukRetries = MaxPUKRetries
+			f.cardInfo.pinRetries = internal.MaxPINRetries
+			f.cardInfo.pukRetries = internal.MaxPUKRetries
 			f.params[PIN] = newPIN
 			delete(f.params, NewPIN)
 			delete(f.params, PUK)
@@ -256,7 +258,7 @@ func (f *KeycardFlow) authenticate(kc *internal.KeycardContext) error {
 		err := kc.VerifyPin(pin.(string))
 
 		if err == nil {
-			f.cardInfo.pinRetries = MaxPINRetries
+			f.cardInfo.pinRetries = internal.MaxPINRetries
 			return nil
 		} else if internal.IsSCardError(err) {
 			return restartErr()
@@ -368,8 +370,8 @@ func (f *KeycardFlow) storeMetadata(kc *internal.KeycardContext) error {
 
 	paths := make([]uint32, len(wallets))
 	for i, p := range wallets {
-		if !strings.HasPrefix(p.(string), WalletRoothPath) {
-			return errors.New("path must start with " + WalletRoothPath)
+		if !strings.HasPrefix(p.(string), internal.WalletRoothPath) {
+			return errors.New("path must start with " + internal.WalletRoothPath)
 		}
 
 		_, components, err := derivationpath.Decode(p.(string))
@@ -406,7 +408,7 @@ func (f *KeycardFlow) exportKey(kc *internal.KeycardContext, path string, onlyPu
 }
 
 func (f *KeycardFlow) exportKeyExtended(kc *internal.KeycardContext, path string, p2 uint8) (*internal.KeyPair, error) {
-	keyPair, err := kc.ExportKey(true, path == MasterPath, p2, path)
+	keyPair, err := kc.ExportKey(true, path == internal.MasterPath, p2, path)
 
 	if internal.IsSCardError(err) {
 		return nil, restartErr()
@@ -460,7 +462,7 @@ func (f *KeycardFlow) loadKeys(kc *internal.KeycardContext) error {
 			return err
 		}
 
-		f.cardInfo.keyUID = internal.Btox(keyUID)
+		f.cardInfo.keyUID = utils.Btox(keyUID)
 		return nil
 	}
 
@@ -473,10 +475,10 @@ func (f *KeycardFlow) loadKeys(kc *internal.KeycardContext) error {
 		case float64:
 			mnemonicLength = int(t)
 		default:
-			mnemonicLength = DefMnemoLen
+			mnemonicLength = internal.DefMnemoLen
 		}
 	} else {
-		mnemonicLength = DefMnemoLen
+		mnemonicLength = internal.DefMnemoLen
 	}
 
 	indexes, err := kc.GenerateMnemonic(mnemonicLength / 3)
@@ -581,7 +583,7 @@ func (f *KeycardFlow) sign(kc *internal.KeycardContext) (*internal.Signature, er
 	var rawHash []byte
 
 	if hashOK {
-		rawHash, err = internal.Xtob(hash.(string))
+		rawHash, err = utils.Xtob(hash.(string))
 		if err != nil {
 			hashOK = false
 		}
