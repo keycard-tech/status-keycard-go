@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/status-im/keycard-go"
 	"github.com/status-im/status-keycard-go/internal"
 	"github.com/status-im/status-keycard-go/pkg/pairing"
 	"github.com/status-im/status-keycard-go/signal"

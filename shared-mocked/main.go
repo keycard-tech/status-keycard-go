@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"unsafe"
 
-	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/pkg/flow"
 	"github.com/status-im/status-keycard-go/pkg/flow/mocked"
+	"github.com/status-im/status-keycard-go/signal"
 )
 
 func main() {}

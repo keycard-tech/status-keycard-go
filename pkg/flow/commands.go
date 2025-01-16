@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/keycard-go/apdu"
 	"github.com/status-im/keycard-go/derivationpath"
 	ktypes "github.com/status-im/keycard-go/types"
+
 	"github.com/status-im/status-keycard-go/internal"
 )
 

@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
 	"github.com/status-im/status-keycard-go/pkg/flow"
+	"github.com/status-im/status-keycard-go/signal"
 )
 
 func (mkf *MockedKeycardFlow) handleExportPublicFlow() {
@@ -121,7 +121,7 @@ func (mkf *MockedKeycardFlow) handleExportPublicFlow() {
 			}
 
 			if pathStr, ok := path.(string); ok {
-				keyPair, _ := mkf.insertedKeycardHelper.ExportedKey[pathStr]
+				keyPair := mkf.insertedKeycardHelper.ExportedKey[pathStr]
 
 				if keyPair.Address == "" {
 					keyPair.Address = "0x" + strings.Repeat("0", 39) + "1"
@@ -143,7 +143,7 @@ func (mkf *MockedKeycardFlow) handleExportPublicFlow() {
 				keys := make([]*internal.KeyPair, len(paths))
 
 				for i, path := range paths {
-					keyPair, _ := mkf.insertedKeycardHelper.ExportedKey[path.(string)]
+					keyPair := mkf.insertedKeycardHelper.ExportedKey[path.(string)]
 
 					if keyPair.Address == "" {
 						iAsStr := strconv.Itoa(i + 1)
