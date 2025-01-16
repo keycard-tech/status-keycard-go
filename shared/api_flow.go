@@ -40,6 +40,10 @@ func jsonToParams(jsonParams *C.char) (flow.FlowParams, error) {
 
 //export KeycardInitFlow
 func KeycardInitFlow(storageDir *C.char) *C.char {
+	if err := checkAPIMutualExclusion(flowAPI); err != nil {
+		return retErr(err)
+	}
+
 	var err error
 	globalFlow, err = flow.NewFlow(C.GoString(storageDir))
 
