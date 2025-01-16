@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -12,19 +11,20 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/status-im/status-keycard-go/pkg/api"
+	"github.com/status-im/status-keycard-go/pkg/session"
 	"go.uber.org/zap"
-	"encoding/json"
+	"github.com/status-im/status-keycard-go/signal"
+	"os"
 )
 
 type Server struct {
-	logger      *zap.Logger
-	server      *http.Server
-	listener    net.Listener
-	mux         *http.ServeMux
-	lock        sync.Mutex
-	connections map[*websocket.Conn]struct{}
-	address     string
+	logger          *zap.Logger
+	server          *http.Server
+	listener        net.Listener
+	mux             *http.ServeMux
+	connectionsLock sync.Mutex
+	connections     map[*websocket.Conn]struct{}
+	address         string
 }
 
 func NewServer(logger *zap.Logger) *Server {
@@ -47,12 +47,12 @@ func (s *Server) Port() (int, error) {
 }
 
 func (s *Server) Setup() {
-	//signal.SetMobileSignalHandler(s.signalHandler)
+	signal.SetKeycardSignalHandler(s.signalHandler)
 }
 
 func (s *Server) signalHandler(data []byte) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.connectionsLock.Lock()
+	defer s.connectionsLock.Unlock()
 
 	deleteConnection := func(connection *websocket.Conn) {
 		delete(s.connections, connection)
@@ -93,13 +93,13 @@ func (s *Server) Listen(address string) error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	rpcServer, err := api.CreateRPCServer()
+	rpcServer, err := session.CreateRPCServer()
 	if err != nil {
 		s.logger.Error("failed to create PRC server", zap.Error(err))
+		os.Exit(1)
 	}
 
 	s.mux = http.NewServeMux()
-	//s.mux.HandleFunc("/health", api.Health)
 	s.mux.HandleFunc("/signals", s.signals)
 	s.mux.Handle("/rpc", rpcServer)
 	s.server.Handler = s.mux
@@ -140,8 +140,8 @@ func (s *Server) Stop(ctx context.Context) {
 }
 
 func (s *Server) signals(w http.ResponseWriter, r *http.Request) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.connectionsLock.Lock()
+	defer s.connectionsLock.Unlock()
 
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -158,85 +158,3 @@ func (s *Server) signals(w http.ResponseWriter, r *http.Request) {
 
 	s.connections[connection] = struct{}{}
 }
-
-func (s *Server) addEndpointWithResponse(name string, handler func(string) interface{}) {
-	s.logger.Debug("adding endpoint", zap.String("name", name))
-	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
-		request, err := io.ReadAll(r.Body)
-		if err != nil {
-			s.logger.Error("failed to read request", zap.Error(err))
-			return
-		}
-
-		response := handler(string(request))
-
-		s.setHeaders(name, w)
-
-		responseBytes, err := json.Marshal(response)
-		_, err = w.Write(responseBytes)
-		if err != nil {
-			s.logger.Error("failed to write response", zap.Error(err))
-		}
-	})
-}
-
-func (s *Server) addEndpointNoRequest(name string, handler func() string) {
-	s.logger.Debug("adding endpoint", zap.String("name", name))
-	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
-		response := handler()
-
-		s.setHeaders(name, w)
-
-		_, err := w.Write([]byte(response))
-		if err != nil {
-			s.logger.Error("failed to write response", zap.Error(err))
-		}
-	})
-}
-
-func (s *Server) addUnsupportedEndpoint(name string) {
-	s.logger.Debug("marking unsupported endpoint", zap.String("name", name))
-	s.mux.HandleFunc(name, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotImplemented)
-	})
-}
-
-func (s *Server) RegisterMobileAPI() {
-	EndpointsWithRequest := map[string]func(string) interface{}{
-		//"/api/v2/Start":        api.Start,
-		//"/api/v2/Stop":         api.Stop,
-		//"/api/v2/SelectApplet": api.SelectApplet,
-	}
-
-	for name, endpoint := range EndpointsWithRequest {
-		s.addEndpointWithResponse(name, endpoint)
-	}
-
-	//for name, endpoint := range EndpointsWithoutRequest {
-	//	s.addEndpointNoRequest(name, endpoint)
-	//}
-	//for _, name := range EndpointsUnsupported {
-	//	s.addUnsupportedEndpoint(name)
-	//}
-}
-
-func (s *Server) setHeaders(name string, w http.ResponseWriter) {
-	//if _, ok := EndpointsDeprecated[name]; ok {
-	//	w.Header().Set("Deprecation", "true")
-	//}
-	w.Header().Set("Content-Type", "application/json")
-}
-
-//type endpoint[requestT any] struct {
-//	name    string
-//	handler func(requestT) (interface{}, error)
-//}
-//
-//func (e *endpoint[requestT]) handle(requestJSON string) (interface{}, error) {
-//	var request requestT
-//	err := json.Unmarshal([]byte(requestJSON), &request)
-//	if err != nil {
-//		return nil, errors.Wrap(err, "failed to unmarshal request")
-//	}
-//	return e.handler(request)
-//}

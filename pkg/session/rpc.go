@@ -1,4 +1,4 @@
-package api
+package session
 
 import (
 	gorillajson "github.com/gorilla/rpc/json"
@@ -8,6 +8,6 @@ import (
 func CreateRPCServer() (*rpc.Server, error) {
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(gorillajson.NewCodec(), "application/json")
-	err := rpcServer.RegisterService(&GlobalKeycardService, "keycard")
+	err := rpcServer.RegisterTCPService(&globalKeycardService, "keycard")
 	return rpcServer, err
 }

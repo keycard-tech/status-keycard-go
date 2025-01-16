@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-keycard-go/cmd/status-keycard-server/server"
 	"go.uber.org/zap"
 	"fmt"
+	"go.uber.org/zap/zapcore"
 )
 
 var (
@@ -18,7 +19,9 @@ var (
 
 func init() {
 	var err error
-	rootLogger, err = zap.NewDevelopment()
+	config := zap.NewDevelopmentConfig()
+	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	rootLogger, err = config.Build()
 	if err != nil {
 		fmt.Printf("failed to initialize log: %v\n", err)
 	}
@@ -31,10 +34,6 @@ func main() {
 	flag.Parse()
 	go handleInterrupts()
 
-	// TEMP:
-	//response := api.Start("")
-	//fmt.Println(response)
-
 	srv := server.NewServer(rootLogger)
 	srv.Setup()
 
@@ -45,7 +44,6 @@ func main() {
 	}
 
 	logger.Info("keycard-server started", zap.String("address", srv.Address()))
-	srv.RegisterMobileAPI()
 	srv.Serve()
 }
 
