@@ -21,6 +21,7 @@ const pnpNotificationReader = `\\?PnP?\Notification`
 
 var (
 	errKeycardNotConnected = errors.New("keycard not connected")
+	errKeycardNotReady     = errors.New("keycard not ready")
 )
 
 type KeycardContextV2 struct {
@@ -376,6 +377,10 @@ func (kc *KeycardContextV2) keycardConnected() bool {
 	return kc.cmdSet != nil
 }
 
+func (kc *KeycardContextV2) keycardReady() bool {
+	return kc.keycardConnected() && kc.status.State == Ready
+}
+
 func (kc *KeycardContextV2) checkSCardError(err error, context string) error {
 	if err == nil {
 		return nil
@@ -498,8 +503,8 @@ func (kc *KeycardContextV2) UnblockPIN(puk string, newPIN string) error {
 }
 
 func (kc *KeycardContextV2) GenerateMnemonic(mnemonicLength int) ([]int, error) {
-	if !kc.keycardConnected() {
-		return nil, errKeycardNotConnected
+	if !kc.keycardReady() {
+		return nil, errKeycardNotReady
 	}
 
 	indexes, err := kc.cmdSet.GenerateMnemonic(mnemonicLength / 3)
@@ -507,8 +512,8 @@ func (kc *KeycardContextV2) GenerateMnemonic(mnemonicLength int) ([]int, error) 
 }
 
 func (kc *KeycardContextV2) LoadMnemonic(mnemonic string, password string) ([]byte, error) {
-	if !kc.keycardConnected() {
-		return nil, errKeycardNotConnected
+	if !kc.keycardReady() {
+		return nil, errKeycardNotReady
 	}
 
 	seed := kc.mnemonicToBinarySeed(mnemonic, password)

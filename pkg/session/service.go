@@ -134,15 +134,15 @@ func (s *KeycardService) Unblock(args *UnblockRequest, reply *struct{}) error {
 	return err
 }
 
-type GenerateSeedPhraseRequest struct {
+type GenerateMnemonicRequest struct {
 	Length int `json:"length"`
 }
 
-type GenerateSeedPhraseResponse struct {
+type GenerateMnemonicResponse struct {
 	Indexes []int `json:"indexes"`
 }
 
-func (s *KeycardService) GenerateSeedPhrase(args *GenerateSeedPhraseRequest, reply *GenerateSeedPhraseResponse) error {
+func (s *KeycardService) GenerateMnemonic(args *GenerateMnemonicRequest, reply *GenerateMnemonicResponse) error {
 	if s.keycardContext == nil {
 		return errKeycardServiceNotStarted
 	}
@@ -169,11 +169,14 @@ func (s *KeycardService) LoadMnemonic(args *LoadMnemonicRequest, reply *LoadMnem
 		return errKeycardServiceNotStarted
 	}
 
-	keyUID, err := s.keycardContext.LoadMnemonic(args.Mnemonic, args.Passphrase)
+	err := validate.Struct(args)
 	if err != nil {
-		reply.KeyUID = utils.Btox(keyUID)
+		errs := err.(validator.ValidationErrors)
+		return goerrors.Join(errs)
 	}
 
+	keyUID, err := s.keycardContext.LoadMnemonic(args.Mnemonic, args.Passphrase)
+	reply.KeyUID = utils.Btox(keyUID)
 	return err
 }
 
