@@ -18,6 +18,8 @@ const (
 	EmptyKeycard            State = "empty-keycard"
 	NoAvailablePairingSlots State = "no-available-pairing-slots"
 	PairingError            State = "pairing-error"
+	BlockedPIN              State = "blocked-pin" // PIN remaining attempts == 0
+	BlockedPUK              State = "blocked-puk" // PUK remaining attempts == 0
 	Ready                   State = "ready"
 	FactoryResetting        State = "factory-resetting"
 )

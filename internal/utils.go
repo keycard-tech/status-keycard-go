@@ -71,11 +71,12 @@ func ParseVersion(input []byte) string {
 	return fmt.Sprintf("%d.%d", major, minor)
 }
 
-func ToAppInfoV2(r *ktypes.ApplicationInfo) ApplicationInfoV2 {
+func ToAppInfoV2(r *ktypes.ApplicationInfo) *ApplicationInfoV2 {
 	if r == nil {
-		return ApplicationInfoV2{}
+		return nil
 	}
-	return ApplicationInfoV2{
+	return &ApplicationInfoV2{
+		Installed:      r.Installed,
 		Initialized:    r.Initialized,
 		InstanceUID:    r.InstanceUID,
 		Version:        ParseVersion(r.Version),

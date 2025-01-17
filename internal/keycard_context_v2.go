@@ -260,7 +260,7 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 
 	// Card connected, now check if this is a keycard
 
-	info, err := kc.SelectApplet()
+	appInfo, err := kc.selectApplet()
 	if err != nil {
 		kc.status.State = ConnectionError
 		return errors.Wrap(err, "failed to select applet")
@@ -270,15 +270,14 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 	// NOTE: copy of openSC
 	//
 
-	appInfo := ToAppInfoV2(info)
-	kc.status.AppInfo = &appInfo
+	kc.status.AppInfo = appInfo
 
-	if !info.Installed {
+	if !appInfo.Installed {
 		kc.status.State = NotKeycard
 		return errors.New("card is not a keycard")
 	}
 
-	if !info.Initialized {
+	if !appInfo.Initialized {
 		kc.status.State = EmptyKeycard
 		return errors.New("keycard not initialized")
 	}
@@ -313,6 +312,14 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 			kc.status.State = InternalError
 			return errors.Wrap(err, "failed to store pairing")
 		}
+
+		// After successful pairing, we should `SelectApplet` again to update the ApplicationInfo
+		appInfo, err = kc.selectApplet()
+		if err != nil {
+			kc.status.State = ConnectionError
+			return errors.Wrap(err, "failed to select applet")
+		}
+		kc.status.AppInfo = appInfo
 	}
 
 	err = kc.OpenSecureChannel(pair.Index, pair.Key)
@@ -321,14 +328,10 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 		return errors.Wrap(err, "failed to open secure channel")
 	}
 
-	appStatus, err := kc.GetStatusApplication()
+	err = kc.updateApplicationStatus()
 	if err != nil {
-		kc.status.State = ConnectionError
 		return errors.Wrap(err, "failed to get application status")
 	}
-
-	kc.status.State = Ready
-	kc.status.AppStatus = appStatus
 
 	return nil
 }
@@ -388,6 +391,39 @@ func (kc *KeycardContextV2) checkSCardError(err error, context string) error {
 	return err
 }
 
+func (kc *KeycardContextV2) selectApplet() (*ApplicationInfoV2, error) {
+	info, err := kc.SelectApplet()
+	if err != nil {
+		kc.status.State = ConnectionError
+		return nil, err
+	}
+
+	return ToAppInfoV2(info), err
+}
+
+func (kc *KeycardContextV2) updateApplicationStatus() error {
+	appStatus, err := kc.cmdSet.GetStatusApplication()
+	kc.status.AppStatus = appStatus
+
+	if err != nil {
+		kc.status.State = ConnectionError
+		return err
+	}
+
+	kc.status.State = Ready
+
+	if appStatus != nil {
+		if appStatus.PinRetryCount == 0 {
+			kc.status.State = BlockedPIN
+		}
+		if appStatus.PUKRetryCount == 0 {
+			kc.status.State = BlockedPUK
+		}
+	}
+
+	return nil
+}
+
 func (kc *KeycardContextV2) GetStatus() Status {
 	return *kc.status
 }
@@ -413,8 +449,52 @@ func (kc *KeycardContextV2) VerifyPIN(pin string) error {
 		return errKeycardNotConnected
 	}
 
+	defer func() {
+		// Update app status to get the new pin remaining attempts
+		// Although we can parse the `err` as `keycard.WrongPINError`, it won't work for `err == nil`.
+		err := kc.updateApplicationStatus()
+		if err != nil {
+			kc.logger.Error("failed to update app status after verifying pin")
+		}
+		kc.publishStatus()
+	}()
+
 	err := kc.cmdSet.VerifyPIN(pin)
 	return kc.checkSCardError(err, "VerifyPIN")
+}
+
+func (kc *KeycardContextV2) ChangePIN(pin string) error {
+	if !kc.keycardConnected() {
+		return errKeycardNotConnected
+	}
+
+	defer func() {
+		err := kc.updateApplicationStatus()
+		if err != nil {
+			kc.logger.Error("failed to update app status after changing pin")
+		}
+		kc.publishStatus()
+	}()
+
+	err := kc.cmdSet.ChangePIN(pin)
+	return kc.checkSCardError(err, "ChangePIN")
+}
+
+func (kc *KeycardContextV2) UnblockPIN(puk string, newPIN string) error {
+	if !kc.keycardConnected() {
+		return errKeycardNotConnected
+	}
+
+	defer func() {
+		err := kc.updateApplicationStatus()
+		if err != nil {
+			kc.logger.Error("failed to update app status after unblocking")
+		}
+		kc.publishStatus()
+	}()
+
+	err := kc.cmdSet.UnblockPIN(puk, newPIN)
+	return kc.checkSCardError(err, "UnblockPIN")
 }
 
 func (kc *KeycardContextV2) GenerateMnemonic(mnemonicLength int) ([]int, error) {

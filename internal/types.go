@@ -22,6 +22,7 @@ type ApplicationInfo struct {
 
 // ApplicationInfoV2 is the same as ApplicationInfo but with a string version field.
 type ApplicationInfoV2 struct {
+	Installed      bool            `json:"installed"`
 	Initialized    bool            `json:"initialized"`
 	InstanceUID    utils.HexString `json:"instanceUID"`
 	Version        string          `json:"version"`

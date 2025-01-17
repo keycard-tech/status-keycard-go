@@ -12,6 +12,7 @@ import (
 
 var (
 	errKeycardServiceNotStarted = errors.New("keycard service not started")
+	validate                    = validator.New()
 )
 
 type KeycardService struct {
@@ -56,7 +57,6 @@ func (s *KeycardService) Initialize(args *InitializeRequest, reply *struct{}) er
 		return errKeycardServiceNotStarted
 	}
 
-	validate := validator.New()
 	err := validate.Struct(args)
 	if err != nil {
 		errs := err.(validator.ValidationErrors)
@@ -71,8 +71,33 @@ func (s *KeycardService) Initialize(args *InitializeRequest, reply *struct{}) er
 	return err
 }
 
+type ChangePINRequest struct {
+	CurrentPIN string `json:"currentPin" validate:"required,len=6"`
+	NewPIN     string `json:"newPin" validate:"required,len=6"`
+}
+
+func (s *KeycardService) ChangePIN(args *ChangePINRequest, reply *struct{}) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	err := validate.Struct(args)
+	if err != nil {
+		errs := err.(validator.ValidationErrors)
+		return goerrors.Join(errs)
+	}
+
+	err = s.keycardContext.VerifyPIN(args.CurrentPIN)
+	if err != nil {
+		return err
+	}
+
+	err = s.keycardContext.ChangePIN(args.NewPIN)
+	return err
+}
+
 type VerifyPINRequest struct {
-	PIN string `json:"pin"`
+	PIN string `json:"pin" validate:"required,len=6"`
 }
 
 type VerifyPINResponse struct {
@@ -85,11 +110,28 @@ func (s *KeycardService) VerifyPIN(args *VerifyPINRequest, reply *VerifyPINRespo
 	}
 
 	err := s.keycardContext.VerifyPIN(args.PIN)
-	if err != nil {
-		return err
+	reply.PINCorrect = err == nil
+	return err
+}
+
+type UnblockRequest struct {
+	PUK    string `json:"puk" validate:"required,len=12"`
+	NewPIN string `json:"newPin" validate:"required,len=6"`
+}
+
+func (s *KeycardService) Unblock(args *UnblockRequest, reply *struct{}) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
 	}
-	reply.PINCorrect = true
-	return nil
+
+	err := validate.Struct(args)
+	if err != nil {
+		errs := err.(validator.ValidationErrors)
+		return goerrors.Join(errs)
+	}
+
+	err = s.keycardContext.UnblockPIN(args.PUK, args.NewPIN)
+	return err
 }
 
 type GenerateSeedPhraseRequest struct {
@@ -114,7 +156,7 @@ func (s *KeycardService) GenerateSeedPhrase(args *GenerateSeedPhraseRequest, rep
 }
 
 type LoadMnemonicRequest struct {
-	Mnemonic   string `json:"mnemonic"`
+	Mnemonic   string `json:"mnemonic" validate:"required"`
 	Passphrase string `json:"passphrase"`
 }
 
