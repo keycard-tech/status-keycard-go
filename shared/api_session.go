@@ -2,23 +2,40 @@ package main
 
 import "C"
 import (
-	"github.com/status-im/status-keycard-go/pkg/session"
-	"go.uber.org/zap"
-	"net/http/httptest"
-	"io"
-	"fmt"
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http/httptest"
+
 	"github.com/gorilla/rpc"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-keycard-go/pkg/session"
 )
 
 var (
 	globalRPCServer *rpc.Server
 )
 
+func marshalError(err error) *C.char {
+	response := struct {
+		Error string `json:"error"`
+	}{
+		Error: "",
+	}
+	if err != nil {
+		response.Error = err.Error()
+	}
+	responseBytes, _ := json.Marshal(response)
+	return C.CString(string(responseBytes))
+}
+
 //export KeycardInitializeRPC
 func KeycardInitializeRPC() *C.char {
 	if err := checkAPIMutualExclusion(sessionAPI); err != nil {
-		return C.CString(err.Error())
+		return marshalError(err)
 	}
 
 	// TEMP: Replace with logging to a file, take the path as an argument
@@ -30,17 +47,17 @@ func KeycardInitializeRPC() *C.char {
 
 	rpcServer, err := session.CreateRPCServer()
 	if err != nil {
-		return C.CString(err.Error())
+		return marshalError(err)
 	}
 	globalRPCServer = rpcServer
 	logger.Info("RPC server initialized")
-	return C.CString("")
+	return marshalError(nil)
 }
 
 //export KeycardCallRPC
 func KeycardCallRPC(payload *C.char) *C.char {
 	if globalRPCServer == nil {
-		return C.CString("RPC server not initialized")
+		return marshalError(errors.New("RPC server not initialized"))
 	}
 
 	payloadBytes := []byte(C.GoString(payload))
@@ -61,7 +78,7 @@ func KeycardCallRPC(payload *C.char) *C.char {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return C.CString(fmt.Sprintf("Error reading response: %v", err))
+		return marshalError(errors.Wrap(err, "internal error reading response body"))
 	}
 
 	return C.CString(string(body))
