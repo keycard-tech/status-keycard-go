@@ -1,8 +1,12 @@
 package session
 
 import (
-	"github.com/status-im/status-keycard-go/internal"
+	goerrors "errors"
+
+	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
+
+	"github.com/status-im/status-keycard-go/internal"
 	"github.com/status-im/status-keycard-go/pkg/utils"
 )
 
@@ -30,22 +34,40 @@ func (s *KeycardService) Stop(args *struct{}, reply *struct{}) error {
 	return nil
 }
 
-type InitializeKeycardRequest struct {
-	PIN             string `json:"pin"`
-	PUK             string `json:"puk"`
+// GetStatus should not be really used, as Status is pushed with `status-changed` signal.
+// But it's handy to have for debugging purposes.
+func (s *KeycardService) GetStatus(args *struct{}, reply *internal.Status) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	*reply = s.keycardContext.GetStatus()
+	return nil
+}
+
+type InitializeRequest struct {
+	PIN             string `json:"pin" validate:"required,len=6"`
+	PUK             string `json:"puk" validate:"required,len=12"`
 	PairingPassword string `json:"pairingPassword"`
 }
 
-func (s *KeycardService) InitializeKeycard(args *InitializeKeycardRequest, reply *struct{}) error {
+func (s *KeycardService) Initialize(args *InitializeRequest, reply *struct{}) error {
 	if s.keycardContext == nil {
 		return errKeycardServiceNotStarted
+	}
+
+	validate := validator.New()
+	err := validate.Struct(args)
+	if err != nil {
+		errs := err.(validator.ValidationErrors)
+		return goerrors.Join(errs)
 	}
 
 	if args.PairingPassword == "" {
 		args.PairingPassword = internal.DefPairing
 	}
 
-	err := s.keycardContext.InitializeKeycard(args.PIN, args.PUK, args.PairingPassword)
+	err = s.keycardContext.Initialize(args.PIN, args.PUK, args.PairingPassword)
 	return err
 }
 
@@ -110,5 +132,14 @@ func (s *KeycardService) LoadMnemonic(args *LoadMnemonicRequest, reply *LoadMnem
 		reply.KeyUID = utils.Btox(keyUID)
 	}
 
+	return err
+}
+
+func (s *KeycardService) FactoryReset(args *struct{}, reply *struct{}) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	err := s.keycardContext.FactoryReset()
 	return err
 }

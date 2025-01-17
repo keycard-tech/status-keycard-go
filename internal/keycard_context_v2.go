@@ -134,6 +134,8 @@ func (kc *KeycardContextV2) monitorRoutine(logger *zap.Logger) bool {
 
 	if readers.Empty() {
 		kc.status.State = WaitingForReader
+		kc.status.AppInfo = nil
+		kc.status.AppStatus = nil
 		kc.publishStatus()
 	}
 
@@ -219,6 +221,8 @@ func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) error {
 	if !ok {
 		kc.logger.Debug("no card found on any readers")
 		kc.status.State = WaitingForCard
+		kc.status.AppInfo = nil
+		kc.status.AppStatus = nil
 		kc.publishStatus()
 		return nil
 	}
@@ -262,21 +266,25 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 		return errors.Wrap(err, "failed to select applet")
 	}
 
-	kc.logger.Debug("card connected")
-	kc.status.State = ConnectingCard
-	kc.publishStatus()
-
 	//
 	// NOTE: copy of openSC
 	//
+
+	appInfo := ToAppInfoV2(info)
+	kc.status.AppInfo = &appInfo
 
 	if !info.Installed {
 		kc.status.State = NotKeycard
 		return errors.New("card is not a keycard")
 	}
 
-	appInfo := ToAppInfoV2(info)
-	kc.status.AppInfo = &appInfo
+	if !info.Initialized {
+		kc.status.State = EmptyKeycard
+		return errors.New("keycard not initialized")
+	}
+
+	kc.status.State = ConnectingCard
+	kc.publishStatus()
 
 	pair := kc.pairings.Get(appInfo.InstanceUID.String())
 
@@ -348,7 +356,7 @@ func (kc *KeycardContextV2) publishStatus() {
 }
 
 func (kc *KeycardContextV2) Stop() {
-	kc.forceScan = true
+	kc.forceScan = false
 	if kc.cardCtx != nil {
 		err := kc.cardCtx.Cancel()
 		if err != nil {
@@ -380,14 +388,24 @@ func (kc *KeycardContextV2) checkSCardError(err error, context string) error {
 	return err
 }
 
-func (kc *KeycardContextV2) InitializeKeycard(pin, puk, pairingPassword string) error {
+func (kc *KeycardContextV2) GetStatus() Status {
+	return *kc.status
+}
+
+func (kc *KeycardContextV2) Initialize(pin, puk, pairingPassword string) error {
 	if !kc.keycardConnected() {
 		return errKeycardNotConnected
 	}
 
 	secrets := keycard.NewSecrets(pin, puk, pairingPassword)
 	err := kc.cmdSet.Init(secrets)
-	return kc.checkSCardError(err, "Init")
+	if err != nil {
+		return kc.checkSCardError(err, "Init")
+	}
+
+	// Reset card connection to pair the card and open secure channel
+	kc.resetCardConnection(true)
+	return nil
 }
 
 func (kc *KeycardContextV2) VerifyPIN(pin string) error {
@@ -416,4 +434,21 @@ func (kc *KeycardContextV2) LoadMnemonic(mnemonic string, password string) ([]by
 	seed := kc.mnemonicToBinarySeed(mnemonic, password)
 	keyUID, err := kc.loadSeed(seed)
 	return keyUID, kc.checkSCardError(err, "LoadMnemonic")
+}
+
+func (kc *KeycardContextV2) FactoryReset() error {
+	if !kc.keycardConnected() {
+		return errKeycardNotConnected
+	}
+
+	kc.status.Reset()
+	kc.status.State = FactoryResetting
+	kc.publishStatus()
+
+	kc.logger.Debug("factory reset")
+	err := kc.KeycardContext.FactoryReset(true)
+
+	// Reset card connection to read the card data
+	kc.resetCardConnection(true)
+	return err
 }

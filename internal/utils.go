@@ -2,12 +2,12 @@ package internal
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/ebfe/scard"
-	keycard "github.com/status-im/keycard-go"
+	"github.com/status-im/keycard-go"
 	"github.com/status-im/keycard-go/derivationpath"
 	ktypes "github.com/status-im/keycard-go/types"
-	"fmt"
 )
 
 func IsSCardError(err error) bool {
@@ -59,6 +59,9 @@ func ToAppInfo(r *ktypes.ApplicationInfo) ApplicationInfo {
 }
 
 func ParseVersion(input []byte) string {
+	if len(input) == 0 {
+		return ""
+	}
 	if len(input) != 2 {
 		return "unexpected version format"
 	}

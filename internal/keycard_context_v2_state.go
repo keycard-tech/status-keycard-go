@@ -15,9 +15,11 @@ const (
 	ConnectingCard          State = "connecting-card"
 	ConnectionError         State = "connection-error" // NOTE: Perhaps a good place for retry
 	NotKeycard              State = "not-keycard"
+	EmptyKeycard            State = "empty-keycard"
 	NoAvailablePairingSlots State = "no-available-pairing-slots"
 	PairingError            State = "pairing-error"
 	Ready                   State = "ready"
+	FactoryResetting        State = "factory-resetting"
 )
 
 type Status struct {
