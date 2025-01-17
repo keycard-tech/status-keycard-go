@@ -7,16 +7,17 @@ import (
 type State string
 
 const (
-	UnknownReaderState State = "unknown"
-	NoPCSC             State = "no-pcsc"
-	InternalError      State = "internal-error"
-	WaitingForReader   State = "waiting-for-reader"
-	WaitingForCard     State = "waiting-for-card"
-	ConnectingCard     State = "connecting-card"
-	ConnectionError    State = "connection-error" // NOTE: Perhaps a good place for retry
-	NotKeycard         State = "not-keycard"
-	PairingError       State = "pairing-error"
-	Ready              State = "ready"
+	UnknownReaderState      State = "unknown"
+	NoPCSC                  State = "no-pcsc"
+	InternalError           State = "internal-error"
+	WaitingForReader        State = "waiting-for-reader"
+	WaitingForCard          State = "waiting-for-card"
+	ConnectingCard          State = "connecting-card"
+	ConnectionError         State = "connection-error" // NOTE: Perhaps a good place for retry
+	NotKeycard              State = "not-keycard"
+	NoAvailablePairingSlots State = "no-available-pairing-slots"
+	PairingError            State = "pairing-error"
+	Ready                   State = "ready"
 )
 
 type Status struct {

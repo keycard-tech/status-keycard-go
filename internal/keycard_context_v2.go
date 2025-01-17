@@ -1,15 +1,17 @@
 package internal
 
 import (
-	"github.com/ebfe/scard"
-	"go.uber.org/zap"
-	"runtime"
-	"github.com/status-im/keycard-go/io"
-	"github.com/status-im/keycard-go"
 	"context"
-	"github.com/status-im/status-keycard-go/pkg/pairing"
-	"github.com/status-im/keycard-go/types"
+	"runtime"
+
+	"github.com/ebfe/scard"
 	"github.com/pkg/errors"
+	"github.com/status-im/keycard-go"
+	"github.com/status-im/keycard-go/io"
+	"github.com/status-im/keycard-go/types"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-keycard-go/pkg/pairing"
 	"github.com/status-im/status-keycard-go/signal"
 )
 
@@ -274,6 +276,8 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 	}
 
 	appInfo := ToAppInfoV2(info)
+	kc.status.AppInfo = &appInfo
+
 	pair := kc.pairings.Get(appInfo.InstanceUID.String())
 
 	if pair == nil {
@@ -285,6 +289,11 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 		var pairingInfo *types.PairingInfo
 		pairingPassword := DefPairing
 		pairingInfo, err = kc.Pair(pairingPassword)
+		if errors.Is(err, keycard.ErrNoAvailablePairingSlots) {
+			kc.status.State = NoAvailablePairingSlots
+			return err
+		}
+
 		if err != nil {
 			kc.status.State = PairingError
 			return errors.Wrap(err, "failed to pair keycard")
@@ -311,7 +320,6 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 	}
 
 	kc.status.State = Ready
-	kc.status.AppInfo = &appInfo
 	kc.status.AppStatus = appStatus
 
 	return nil
