@@ -48,3 +48,12 @@ func (rs ReadersStates) ReaderHasCard(reader string) bool {
 func (rs ReadersStates) Empty() bool {
 	return len(rs) == 0
 }
+
+func (rs ReadersStates) HasChanges() bool {
+	for _, state := range rs {
+		if state.EventState&scard.StateChanged != 0 {
+			return true
+		}
+	}
+	return false
+}

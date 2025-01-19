@@ -3,6 +3,8 @@ package internal
 import (
 	"context"
 	"runtime"
+	"sync/atomic"
+	"time"
 
 	"github.com/ebfe/scard"
 	"github.com/pkg/errors"
@@ -28,7 +30,7 @@ type KeycardContextV2 struct {
 	KeycardContext
 
 	shutdown     func()
-	forceScan    bool // Needed to distinguish cardCtx.cancel() from a real shutdown
+	forceScan    atomic.Bool // Needed to distinguish cardCtx.cancel() from a real shutdown
 	logger       *zap.Logger
 	pairings     *pairing.Store
 	status       *Status
@@ -60,10 +62,10 @@ func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error
 
 	ctx, cancel := context.WithCancel(context.Background())
 	kc.shutdown = cancel
-	kc.forceScan = false
+	kc.forceScan.Store(false)
 
 	go kc.cardCommunicationRoutine(ctx)
-	kc.monitor()
+	kc.monitor(ctx)
 
 	return kc, nil
 }
@@ -101,7 +103,7 @@ func (kc *KeycardContext) cardCommunicationRoutine(ctx context.Context) {
 	}
 }
 
-func (kc *KeycardContextV2) monitor() {
+func (kc *KeycardContextV2) monitor(ctx context.Context) {
 	if kc.cardCtx == nil {
 		panic("card context is nil")
 	}
@@ -112,7 +114,7 @@ func (kc *KeycardContextV2) monitor() {
 		defer logger.Debug("monitor stopped")
 		// This goroutine will be stopped by cardCtx.Cancel()
 		for {
-			finish := kc.monitorRoutine(logger)
+			finish := kc.monitorRoutine(ctx, logger)
 			if finish {
 				return
 			}
@@ -120,7 +122,7 @@ func (kc *KeycardContextV2) monitor() {
 	}()
 }
 
-func (kc *KeycardContextV2) monitorRoutine(logger *zap.Logger) bool {
+func (kc *KeycardContextV2) monitorRoutine(ctx context.Context, logger *zap.Logger) bool {
 	// Get current readers list and state
 	readers, err := kc.getCurrentReadersState()
 	if err != nil {
@@ -131,9 +133,7 @@ func (kc *KeycardContextV2) monitorRoutine(logger *zap.Logger) bool {
 		return false
 	}
 
-	logger.Debug("readers list updated", zap.Any("available", readers))
-
-	if readers.Empty() {
+	if readers.Empty() && kc.status.State != WaitingForReader {
 		kc.status.State = WaitingForReader
 		kc.status.AppInfo = nil
 		kc.status.AppStatus = nil
@@ -148,23 +148,63 @@ func (kc *KeycardContextV2) monitorRoutine(logger *zap.Logger) bool {
 	// Wait for readers changes, including new readers
 	// https://blog.apdu.fr/posts/2024/08/improved-scardgetstatuschange-for-pnpnotification-special-reader/
 	// NOTE: The article states that MacOS is not supported, but works for me on MacOS 15.1.1 (24B91).
-	pnpReader := scard.ReaderState{
-		Reader:       pnpNotificationReader,
-		CurrentState: scard.StateUnaware,
-	}
-	rs := append(readers, pnpReader)
+	//pnpReader := scard.ReaderState{
+	//	Reader:       pnpNotificationReader,
+	//	CurrentState: scard.StateUnaware,
+	//}
+	//rs := append(readers, pnpReader)
+	//err = kc.cardCtx.GetStatusChange(rs, infiniteTimeout)
 
-	err = kc.cardCtx.GetStatusChange(rs, infiniteTimeout)
-	if err == scard.ErrCancelled && !kc.forceScan {
+	rs := append(readers)
+	err = kc.getStatusChange(ctx, rs, infiniteTimeout)
+	if err == scard.ErrCancelled && !kc.forceScan.Load() {
 		// Shutdown requested
 		return true
 	}
 	if err != scard.ErrCancelled && err != nil {
-		kc.logger.Error("failed to get status change", zap.Error(err))
+		logger.Error("failed to get status change", zap.Error(err))
 		return false
 	}
 
 	return false
+}
+
+func (kc *KeycardContextV2) getStatusChange(ctx context.Context, readersStates ReadersStates, timeout time.Duration) error {
+	//return kc.cardCtx.GetStatusChange(readersStates, timeout)
+
+	timer := time.NewTimer(timeout)
+	if timeout < 0 {
+		timer.Stop() // FIXME: Will it stop, but not tick?
+	}
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-timer.C:
+			return scard.ErrTimeout
+		case <-ticker.C:
+			if len(readersStates) == 0 {
+				return nil
+			}
+			if kc.forceScan.Load() {
+				return scard.ErrCancelled
+			}
+
+			err := kc.cardCtx.GetStatusChange(readersStates, 100*time.Millisecond)
+			if err == scard.ErrTimeout {
+				break
+			}
+			if err != nil {
+				return err
+			}
+			if readersStates.HasChanges() {
+				return nil
+			}
+		}
+	}
 }
 
 func (kc *KeycardContextV2) getCurrentReadersState() (ReadersStates, error) {
@@ -203,7 +243,7 @@ func (kc *KeycardContextV2) getCurrentReadersState() (ReadersStates, error) {
 }
 
 func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) error {
-	if !kc.forceScan &&
+	if !kc.forceScan.Load() &&
 		kc.activeReader != "" &&
 		readers.Contains(kc.activeReader) &&
 		readers.ReaderHasCard(kc.activeReader) {
@@ -215,7 +255,7 @@ func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) error {
 		return nil
 	}
 
-	kc.forceScan = false
+	kc.forceScan.Store(false)
 	kc.resetCardConnection(false)
 
 	readerWithCardIndex, ok := readers.ReaderWithCardIndex()
@@ -346,7 +386,7 @@ func (kc *KeycardContextV2) resetCardConnection(forceRescan bool) {
 
 	// If a command failed, we need to cancel the context. This will force the monitor to reconnect to the card.
 	if forceRescan {
-		kc.forceScan = true
+		kc.forceScan.Store(true)
 		err := kc.cardCtx.Cancel()
 		if err != nil {
 			kc.logger.Error("failed to cancel context", zap.Error(err))
@@ -360,7 +400,7 @@ func (kc *KeycardContextV2) publishStatus() {
 }
 
 func (kc *KeycardContextV2) Stop() {
-	kc.forceScan = false
+	kc.forceScan.Store(false)
 	if kc.cardCtx != nil {
 		err := kc.cardCtx.Cancel()
 		if err != nil {
