@@ -19,10 +19,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
       - name: Install pcsc-lite
         run: sudo apt-get install -y libpcsclite-dev
+
+      - uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -36,6 +36,9 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
+      - name: Install pcsc-lite
+        run: sudo apt-get install -y libpcsclite-dev
+        
       - uses: actions/checkout@v4
 
       - name: Set up Go
