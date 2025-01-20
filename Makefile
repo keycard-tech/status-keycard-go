@@ -51,3 +51,6 @@ build-example-go:
 
 run-example-go: build-example-go
 		$(BUILD_PATH)/example-go
+
+lint:
+	@golangci-lint run
