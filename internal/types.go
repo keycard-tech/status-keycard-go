@@ -1,65 +1,36 @@
 package internal
 
 import (
-	"encoding/json"
+	"github.com/status-im/status-keycard-go/pkg/utils"
 )
 
-type HexString []byte
-
-// MarshalJSON serializes HexString to hex
-func (s HexString) MarshalJSON() ([]byte, error) {
-	bytes, err := json.Marshal(Btox(s))
-	return bytes, err
-}
-
-// UnmarshalJSON deserializes HexString to hex
-func (s *HexString) UnmarshalJSON(data []byte) error {
-	var x string
-	err := json.Unmarshal(data, &x)
-	if err != nil {
-		return err
-	}
-	str, err := Xtob(x)
-	if err != nil {
-		return err
-	}
-
-	*s = HexString([]byte(str))
-	return nil
-}
-
 type Signature struct {
-	R HexString `json:"r"`
-	S HexString `json:"s"`
-	V byte      `json:"v"`
+	R utils.HexString `json:"r"`
+	S utils.HexString `json:"s"`
+	V byte            `json:"v"`
 }
 
 type ApplicationInfo struct {
-	Initialized    bool      `json:"initialized"`
-	InstanceUID    HexString `json:"instanceUID"`
-	Version        int       `json:"version"`
-	AvailableSlots int       `json:"availableSlots"`
+	Initialized    bool            `json:"initialized"`
+	InstanceUID    utils.HexString `json:"instanceUID"`
+	Version        int             `json:"version"`
+	AvailableSlots int             `json:"availableSlots"`
 	// KeyUID is the sha256 of the master public key on the card.
 	// It's empty if the card doesn't contain any key.
-	KeyUID HexString `json:"keyUID"`
-}
-
-type PairingInfo struct {
-	Key   HexString `json:"key"`
-	Index int       `json:"index"`
+	KeyUID utils.HexString `json:"keyUID"`
 }
 
 type KeyPair struct {
-	Address    string    `json:"address"`
-	PublicKey  HexString `json:"publicKey"`
-	PrivateKey HexString `json:"privateKey,omitempty"`
-	ChainCode  HexString `json:"chainCode,omitempty"`
+	Address    string          `json:"address"`
+	PublicKey  utils.HexString `json:"publicKey"`
+	PrivateKey utils.HexString `json:"privateKey,omitempty"`
+	ChainCode  utils.HexString `json:"chainCode,omitempty"`
 }
 
 type Wallet struct {
-	Path      string    `json:"path"`
-	Address   string    `json:"address,omitempty"`
-	PublicKey HexString `json:"publicKey"`
+	Path      string          `json:"path"`
+	Address   string          `json:"address,omitempty"`
+	PublicKey utils.HexString `json:"publicKey"`
 }
 
 type Metadata struct {
