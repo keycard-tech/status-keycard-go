@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	keycard "github.com/status-im/keycard-go"
 	"github.com/status-im/keycard-go/apdu"
 	"github.com/status-im/keycard-go/derivationpath"
 	ktypes "github.com/status-im/keycard-go/types"
@@ -34,6 +35,7 @@ func (f *KeycardFlow) selectKeycard(kc *internal.KeycardContext) error {
 	f.cardInfo.instanceUID = internal.Btox(appInfo.InstanceUID)
 	f.cardInfo.keyUID = internal.Btox(appInfo.KeyUID)
 	f.cardInfo.freeSlots = internal.BytesToInt(appInfo.AvailableSlots)
+	f.cardInfo.version = internal.BytesToInt(appInfo.Version)
 
 	if !appInfo.Installed {
 		return f.pauseAndRestart(SwapCard, internal.ErrorNotAKeycard)
@@ -128,6 +130,20 @@ func (f *KeycardFlow) initCard(kc *internal.KeycardContext) error {
 	return restartErr()
 }
 
+func (f *KeycardFlow) verifyAuthenticity(kc *internal.KeycardContext) error {
+	if (len(f.knownCA) == 0) || (f.cardInfo.instanceUID == f.params[SkipAuthUID]) {
+		return nil
+	}
+
+	ca, err := kc.Identify()
+
+	if (err != nil) || !internal.ContainsString(ca, f.knownCA) {
+		return authenticityErr()
+	}
+
+	return nil
+}
+
 func (f *KeycardFlow) openSC(kc *internal.KeycardContext, giveup bool) error {
 	var pairing *internal.PairingInfo
 
@@ -159,11 +175,17 @@ func (f *KeycardFlow) openSC(kc *internal.KeycardContext, giveup bool) error {
 		f.pairings.Delete(f.cardInfo.instanceUID)
 	}
 
+	err := f.verifyAuthenticity(kc)
+
+	if err != nil {
+		return err
+	}
+
 	if giveup {
 		return giveupErr()
 	}
 
-	err := f.pair(kc)
+	err = f.pair(kc)
 
 	if err != nil {
 		return err
@@ -372,7 +394,18 @@ func (f *KeycardFlow) storeMetadata(kc *internal.KeycardContext) error {
 }
 
 func (f *KeycardFlow) exportKey(kc *internal.KeycardContext, path string, onlyPublic bool) (*internal.KeyPair, error) {
-	keyPair, err := kc.ExportKey(true, path == MasterPath, onlyPublic, path)
+	var p2 uint8
+	if onlyPublic {
+		p2 = keycard.P2ExportKeyPublicOnly
+	} else {
+		p2 = keycard.P2ExportKeyPrivateAndPublic
+	}
+
+	return f.exportKeyExtended(kc, path, p2)
+}
+
+func (f *KeycardFlow) exportKeyExtended(kc *internal.KeycardContext, path string, p2 uint8) (*internal.KeyPair, error) {
+	keyPair, err := kc.ExportKey(true, path == MasterPath, p2, path)
 
 	if internal.IsSCardError(err) {
 		return nil, restartErr()

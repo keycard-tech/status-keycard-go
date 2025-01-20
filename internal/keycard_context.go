@@ -2,6 +2,7 @@ package internal
 
 import (
 	"crypto/sha512"
+	"encoding/hex"
 	"errors"
 	"runtime"
 	"time"
@@ -222,6 +223,16 @@ func (kc *KeycardContext) SelectApplet() (*types.ApplicationInfo, error) {
 	return kc.cmdSet.ApplicationInfo, nil
 }
 
+func (kc *KeycardContext) Identify() (string, error) {
+	ca, err := kc.cmdSet.Identify()
+
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(ca), nil
+}
+
 func (kc *KeycardContext) Pair(pairingPassword string) (*types.PairingInfo, error) {
 	err := kc.cmdSet.Pair(pairingPassword)
 	if err != nil {
@@ -326,16 +337,16 @@ func (kc *KeycardContext) SignWithPath(data []byte, path string) (*types.Signatu
 	return sig, nil
 }
 
-func (kc *KeycardContext) ExportKey(derive bool, makeCurrent bool, onlyPublic bool, path string) (*KeyPair, error) {
+func (kc *KeycardContext) ExportKey(derive bool, makeCurrent bool, p2 uint8, path string) (*KeyPair, error) {
 	address := ""
-	privKey, pubKey, err := kc.cmdSet.ExportKey(derive, makeCurrent, onlyPublic, path)
+	exportedKey, err := kc.cmdSet.ExportKeyExtended(derive, makeCurrent, p2, path)
 	if err != nil {
 		Printf("exportKey failed %+v", err)
 		return nil, err
 	}
 
-	if pubKey != nil {
-		ecdsaPubKey, err := crypto.UnmarshalPubkey(pubKey)
+	if exportedKey.PubKey() != nil {
+		ecdsaPubKey, err := crypto.UnmarshalPubkey(exportedKey.PubKey())
 		if err != nil {
 			return nil, err
 		}
@@ -343,7 +354,7 @@ func (kc *KeycardContext) ExportKey(derive bool, makeCurrent bool, onlyPublic bo
 		address = crypto.PubkeyToAddress(*ecdsaPubKey).Hex()
 	}
 
-	return &KeyPair{Address: address, PublicKey: pubKey, PrivateKey: privKey}, nil
+	return &KeyPair{Address: address, PublicKey: exportedKey.PubKey(), PrivateKey: exportedKey.PrivKey(), ChainCode: exportedKey.ChainCode()}, nil
 }
 
 func (kc *KeycardContext) loadSeed(seed []byte) ([]byte, error) {

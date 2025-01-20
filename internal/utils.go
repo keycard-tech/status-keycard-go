@@ -43,6 +43,16 @@ func BytesToInt(s []byte) int {
 	return int(binary.BigEndian.Uint32(b[:]))
 }
 
+func ContainsString(str string, s []string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
+}
+
 func ToAppInfo(r *ktypes.ApplicationInfo) ApplicationInfo {
 	return ApplicationInfo{
 		Initialized:    r.Initialized,

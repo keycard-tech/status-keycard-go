@@ -7,6 +7,7 @@ type RunState int
 
 type restartError struct{}
 type giveupError struct{}
+type authenticityError struct{}
 
 func restartErr() (e *restartError) {
 	return &restartError{}
@@ -22,6 +23,14 @@ func giveupErr() (e *giveupError) {
 
 func (e *giveupError) Error() string {
 	return "giveup"
+}
+
+func authenticityErr() (e *authenticityError) {
+	return &authenticityError{}
+}
+
+func (e *authenticityError) Error() string {
+	return "authenticity"
 }
 
 const (
@@ -104,6 +113,7 @@ const (
 	CardMeta     = "card-metadata"
 	CardName     = "card-name"
 	WalletPaths  = "wallet-paths"
+	SkipAuthUID  = "skip-auth-uid"
 )
 
 const (

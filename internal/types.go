@@ -53,6 +53,7 @@ type KeyPair struct {
 	Address    string    `json:"address"`
 	PublicKey  HexString `json:"publicKey"`
 	PrivateKey HexString `json:"privateKey,omitempty"`
+	ChainCode  HexString `json:"chainCode,omitempty"`
 }
 
 type Wallet struct {
