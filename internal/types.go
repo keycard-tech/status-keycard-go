@@ -50,3 +50,16 @@ type Metadata struct {
 	Name    string   `json:"name"`
 	Wallets []Wallet `json:"wallets"`
 }
+
+type LoginKeys struct {
+	EncryptionPrivateKey *KeyPair `json:"encryptionPrivateKey"`
+	WhisperPrivateKey    *KeyPair `json:"whisperPrivateKey"`
+}
+
+type RecoverKeys struct {
+	LoginKeys
+	EIP1581key    *KeyPair `json:"eip1581"`
+	WalletRootKey *KeyPair `json:"walletRootKey"`
+	WalletKey     *KeyPair `json:"walletKey"`
+	MasterKey     *KeyPair `json:"masterKey"`
+}

@@ -221,8 +221,35 @@ func (s *KeycardService) GetMetadata(args *struct{}, reply *GetMetadataResponse)
 	if s.keycardContext == nil {
 		return errKeycardServiceNotStarted
 	}
+	var err error
+	reply.Metadata, err = s.keycardContext.GetMetadata()
+	return err
+}
 
-	metadata, err := s.keycardContext.GetMetadata()
-	reply.Metadata = metadata
+type ExportLoginKeysResponse struct {
+	Keys *internal.LoginKeys `json:"keys"`
+}
+
+func (s *KeycardService) ExportLoginKeys(args *struct{}, reply *ExportLoginKeysResponse) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	var err error
+	reply.Keys, err = s.keycardContext.ExportLoginKeys()
+	return err
+}
+
+type ExportRecoveredKeysResponse struct {
+	Keys *internal.RecoverKeys `json:"keys"`
+}
+
+func (s *KeycardService) ExportRecoverKeys(args *struct{}, reply *ExportRecoveredKeysResponse) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	var err error
+	reply.Keys, err = s.keycardContext.ExportRecoverKeys()
 	return err
 }

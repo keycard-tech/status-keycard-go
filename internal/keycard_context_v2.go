@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ebfe/scard"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/status-im/keycard-go"
 	"github.com/status-im/keycard-go/io"
@@ -633,3 +634,102 @@ func (kc *KeycardContextV2) GetMetadata() (*Metadata, error) {
 	return ToMetadata(metadata), nil
 }
 
+func (kc *KeycardContextV2) exportedKeyToAddress(key *types.ExportedKey) (string, error) {
+	if key.PubKey() == nil {
+		return "", nil
+	}
+
+	ecdsaPubKey, err := crypto.UnmarshalPubkey(key.PubKey())
+	if err != nil {
+		return "", errors.Wrap(err, "failed to unmarshal public key")
+	}
+
+	return crypto.PubkeyToAddress(*ecdsaPubKey).Hex(), nil
+}
+
+func (kc *KeycardContextV2) exportKey(path string, exportOption uint8) (*KeyPair, error) {
+	// 1. As for today, it's pointless to use the 'current path' feature. So we always derive.
+	// 2. We keep this workaround for `makeCurrent` to mitigate a bug in an older version of the Keycard applet
+	//    that doesn't correctly export the public key for the master path unless it is also the current path.
+	const derive = true
+	makeCurrent := path == MasterPath
+
+	exportedKey, err := kc.cmdSet.ExportKeyExtended(derive, makeCurrent, exportOption, path)
+	if err != nil {
+		return nil, kc.checkSCardError(err, "ExportKeyExtended")
+	}
+
+	address, err := kc.exportedKeyToAddress(exportedKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert key to address")
+	}
+
+	return &KeyPair{
+		Address:    address,
+		PublicKey:  exportedKey.PubKey(),
+		PrivateKey: exportedKey.PrivKey(),
+		ChainCode:  exportedKey.ChainCode(),
+	}, nil
+}
+
+func (kc *KeycardContextV2) ExportLoginKeys() (*LoginKeys, error) {
+	if !kc.keycardReady() {
+		return nil, errKeycardNotReady
+	}
+
+	var err error
+	keys := &LoginKeys{}
+
+	keys.EncryptionPrivateKey, err = kc.exportKey(EncryptionPath, keycard.P2ExportKeyPrivateAndPublic)
+	if err != nil {
+		return nil, err
+	}
+
+	keys.WhisperPrivateKey, err = kc.exportKey(WhisperPath, keycard.P2ExportKeyPrivateAndPublic)
+	if err != nil {
+		return nil, err
+	}
+
+	return keys, err
+}
+
+func (kc *KeycardContextV2) ExportRecoverKeys() (*RecoverKeys, error) {
+	if !kc.keycardReady() {
+		return nil, errKeycardNotReady
+	}
+
+	loginKeys, err := kc.ExportLoginKeys()
+	if err != nil {
+		return nil, err
+	}
+
+	keys := &RecoverKeys{
+		LoginKeys: *loginKeys,
+	}
+
+	keys.EIP1581key, err = kc.exportKey(Eip1581Path, keycard.P2ExportKeyPublicOnly)
+	if err != nil {
+		return nil, err
+	}
+
+	rootExportOptions := map[bool]uint8{
+		true:  keycard.P2ExportKeyExtendedPublic,
+		false: keycard.P2ExportKeyPublicOnly,
+	}
+	keys.WalletRootKey, err = kc.exportKey(WalletRoothPath, rootExportOptions[kc.status.KeycardSupportsExtendedKeys()])
+	if err != nil {
+		return nil, err
+	}
+
+	keys.WalletKey, err = kc.exportKey(WalletPath, keycard.P2ExportKeyPublicOnly)
+	if err != nil {
+		return nil, err
+	}
+
+	keys.MasterKey, err = kc.exportKey(MasterPath, keycard.P2ExportKeyPublicOnly)
+	if err != nil {
+		return nil, err
+	}
+
+	return keys, err
+}
