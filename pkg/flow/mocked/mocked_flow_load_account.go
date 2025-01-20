@@ -4,9 +4,9 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
 	"github.com/status-im/status-keycard-go/pkg/flow"
+	"github.com/status-im/status-keycard-go/signal"
 )
 
 func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
@@ -89,7 +89,11 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 				mkf.insertedKeycard.PairingInfo = mkf.insertedKeycardHelper.PairingInfo
 			}
 
-			mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+			err := mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+			if err != nil {
+				internal.Printf("error storing pairing: %v", err)
+				return
+			}
 
 			var indexes []int
 			for len(indexes) < enteredMnemonicLength {
@@ -118,7 +122,11 @@ func (mkf *MockedKeycardFlow) handleLoadAccountFlow() {
 				mkf.insertedKeycard.PukRetries = flow.MaxPUKRetries
 				mkf.insertedKeycard.FreePairingSlots = flow.MaxFreeSlots - 1
 
-				mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+				err := mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+				if err != nil {
+					internal.Printf("error storing pairing: %v", err)
+					return
+				}
 
 				finalType = flow.FlowResult
 				flowStatus[flow.InstanceUID] = mkf.insertedKeycard.InstanceUID

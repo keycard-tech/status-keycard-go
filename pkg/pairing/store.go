@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
 	"github.com/status-im/status-keycard-go/internal"
 )
 

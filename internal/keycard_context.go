@@ -9,7 +9,7 @@ import (
 
 	"github.com/ebfe/scard"
 	"github.com/ethereum/go-ethereum/crypto"
-	keycard "github.com/status-im/keycard-go"
+	"github.com/status-im/keycard-go"
 	"github.com/status-im/keycard-go/apdu"
 	"github.com/status-im/keycard-go/globalplatform"
 	"github.com/status-im/keycard-go/identifiers"
@@ -212,7 +212,6 @@ func (kc *KeycardContext) SelectApplet() (*types.ApplicationInfo, error) {
 	err := kc.cmdSet.Select()
 	if err != nil {
 		if e, ok := err.(*apdu.ErrBadResponse); ok && e.Sw == globalplatform.SwFileNotFound {
-			err = nil
 			kc.cmdSet.ApplicationInfo = &types.ApplicationInfo{}
 		} else {
 			Printf("select failed %+v", err)

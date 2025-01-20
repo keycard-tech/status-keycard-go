@@ -3,13 +3,13 @@ package mocked
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
-	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
-	"github.com/status-im/status-keycard-go/pkg/pairing"
 	"github.com/status-im/status-keycard-go/pkg/flow"
+	"github.com/status-im/status-keycard-go/pkg/pairing"
+	"github.com/status-im/status-keycard-go/signal"
 )
 
 type MockedKeycardFlow struct {
@@ -46,9 +46,9 @@ func NewMockedFlow(storageDir string) (*MockedKeycardFlow, error) {
 		mockedKeycardsStoreFilePath: filepath.Join(dir, "mocked_keycards.json"),
 	}
 
-	flow.loadRegisteredKeycards()
+	err = flow.loadRegisteredKeycards()
 
-	return flow, nil
+	return flow, err
 }
 
 func (mkf *MockedKeycardFlow) Start(flowType flow.FlowType, params flow.FlowParams) error {
@@ -223,11 +223,17 @@ func (mkf *MockedKeycardFlow) runFlow() {
 	if mkf.insertedKeycard.InstanceUID != "" {
 		pairing := mkf.pairings.Get(mkf.insertedKeycard.InstanceUID)
 		if pairing == nil {
-			mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+			err := mkf.pairings.Store(mkf.insertedKeycard.InstanceUID, mkf.insertedKeycard.PairingInfo)
+			if err != nil {
+				internal.Printf("error storing pairing: %v", err)
+			}
 		}
 	}
 
-	mkf.storeRegisteredKeycards()
+	err := mkf.storeRegisteredKeycards()
+	if err != nil {
+		internal.Printf("error storing registered keycards: %v", err)
+	}
 }
 
 func (mkf *MockedKeycardFlow) storeRegisteredKeycards() error {
@@ -242,7 +248,7 @@ func (mkf *MockedKeycardFlow) storeRegisteredKeycards() error {
 		return err
 	}
 
-	err = ioutil.WriteFile(mkf.mockedKeycardsStoreFilePath, data, 0644)
+	err = os.WriteFile(mkf.mockedKeycardsStoreFilePath, data, 0644)
 	if err != nil {
 		return err
 	}
@@ -251,7 +257,7 @@ func (mkf *MockedKeycardFlow) storeRegisteredKeycards() error {
 }
 
 func (mkf *MockedKeycardFlow) loadRegisteredKeycards() error {
-	data, err := ioutil.ReadFile(mkf.mockedKeycardsStoreFilePath)
+	data, err := os.ReadFile(mkf.mockedKeycardsStoreFilePath)
 	if err != nil {
 		return err
 	}

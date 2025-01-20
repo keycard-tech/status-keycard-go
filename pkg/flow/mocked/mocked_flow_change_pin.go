@@ -1,9 +1,9 @@
 package mocked
 
 import (
-	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
 	"github.com/status-im/status-keycard-go/pkg/flow"
+	"github.com/status-im/status-keycard-go/signal"
 )
 
 func (mkf *MockedKeycardFlow) handleChangePinFlow() {

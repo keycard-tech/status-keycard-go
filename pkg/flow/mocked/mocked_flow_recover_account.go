@@ -1,9 +1,9 @@
 package mocked
 
 import (
-	"github.com/status-im/status-keycard-go/signal"
 	"github.com/status-im/status-keycard-go/internal"
 	"github.com/status-im/status-keycard-go/pkg/flow"
+	"github.com/status-im/status-keycard-go/signal"
 )
 
 func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
@@ -19,14 +19,13 @@ func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
 		return
 	}
 
-	finalType := flow.SwapCard
 	flowStatus = flow.FlowStatus{
 		flow.InstanceUID: mkf.insertedKeycard.InstanceUID,
 		flow.KeyUID:      mkf.insertedKeycard.KeyUID,
 	}
 
 	if mkf.insertedKeycard.InstanceUID == "" || mkf.insertedKeycard.KeyUID == "" {
-		finalType = flow.SwapCard
+		finalType := flow.SwapCard
 		flowStatus[internal.ErrorKey] = internal.ErrorNoKeys
 		flowStatus[flow.FreeSlots] = 0
 		mkf.state = flow.Paused
@@ -50,7 +49,7 @@ func (mkf *MockedKeycardFlow) handleRecoverAccountFlow() {
 		enteredPUK = v.(string)
 	}
 
-	finalType = flow.EnterPIN
+	finalType := flow.EnterPIN
 	if mkf.insertedKeycard.PukRetries == 0 {
 		flowStatus[internal.ErrorKey] = flow.PUKRetries
 		finalType = flow.SwapCard

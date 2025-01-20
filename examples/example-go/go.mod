@@ -1,6 +1,6 @@
 module github.com/status-im/status-keycard-go/examples/example-go
 
-go 1.16
+go 1.22
 
 require github.com/status-im/status-keycard-go v0.0.0-20220729100846-660760d156d7
 
