@@ -25,6 +25,7 @@ type ApplicationInfoV2 struct {
 	Installed      bool            `json:"installed"`
 	Initialized    bool            `json:"initialized"`
 	InstanceUID    utils.HexString `json:"instanceUID"`
+	versionRaw     int             `json:"-"`
 	Version        string          `json:"version"`
 	AvailableSlots int             `json:"availableSlots"`
 	// KeyUID is the sha256 of the master public key on the card.

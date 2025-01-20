@@ -79,6 +79,7 @@ func ToAppInfoV2(r *ktypes.ApplicationInfo) *ApplicationInfoV2 {
 		Installed:      r.Installed,
 		Initialized:    r.Initialized,
 		InstanceUID:    r.InstanceUID,
+		versionRaw:     BytesToInt(r.Version),
 		Version:        ParseVersion(r.Version),
 		AvailableSlots: BytesToInt(r.AvailableSlots),
 		KeyUID:         r.KeyUID,

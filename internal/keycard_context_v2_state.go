@@ -13,7 +13,7 @@ const (
 	WaitingForReader        State = "waiting-for-reader"
 	WaitingForCard          State = "waiting-for-card"
 	ConnectingCard          State = "connecting-card"
-	ConnectionError         State = "connection-error" // NOTE: Perhaps a good place for retry
+	ConnectionError         State = "connection-error"
 	NotKeycard              State = "not-keycard"
 	EmptyKeycard            State = "empty-keycard"
 	NoAvailablePairingSlots State = "no-available-pairing-slots"
@@ -42,4 +42,8 @@ func (s *Status) Reset(newState State) {
 	s.AppInfo = nil
 	s.AppStatus = nil
 	s.Metadata = nil
+}
+
+func (s *Status) KeycardSupportsExtendedKeys() bool {
+	return s.AppInfo != nil && s.AppInfo.versionRaw >= 0x0310
 }
