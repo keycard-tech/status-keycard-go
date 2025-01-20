@@ -21,6 +21,7 @@ const (
 	BlockedPIN              State = "blocked-pin" // PIN remaining attempts == 0
 	BlockedPUK              State = "blocked-puk" // PUK remaining attempts == 0
 	Ready                   State = "ready"
+	Authorized              State = "authorized" // PIN verified
 	FactoryResetting        State = "factory-resetting"
 )
 

@@ -39,6 +39,9 @@ func (s *KeycardService) Start(args *StartRequest, reply *struct{}) error {
 }
 
 func (s *KeycardService) Stop(args *struct{}, reply *struct{}) error {
+	if s.keycardContext == nil {
+		return nil
+	}
 	s.keycardContext.Stop()
 	s.keycardContext = nil
 	return nil
@@ -79,27 +82,26 @@ func (s *KeycardService) Initialize(args *InitializeRequest, reply *struct{}) er
 	return err
 }
 
-type VerifyPINRequest struct {
+type AuthorizeRequest struct {
 	PIN string `json:"pin" validate:"required,len=6"`
 }
 
-type VerifyPINResponse struct {
-	PINCorrect bool `json:"pinCorrect"`
+type AuthorizeResponse struct {
+	Authorized bool `json:"authorized"`
 }
 
-func (s *KeycardService) VerifyPIN(args *VerifyPINRequest, reply *VerifyPINResponse) error {
+func (s *KeycardService) Authorize(args *AuthorizeRequest, reply *AuthorizeResponse) error {
 	if s.keycardContext == nil {
 		return errKeycardServiceNotStarted
 	}
 
 	err := s.keycardContext.VerifyPIN(args.PIN)
-	reply.PINCorrect = err == nil
+	reply.Authorized = err == nil
 	return err
 }
 
 type ChangePINRequest struct {
-	CurrentPIN string `json:"currentPin" validate:"required,len=6"`
-	NewPIN     string `json:"newPin" validate:"required,len=6"`
+	NewPIN string `json:"newPin" validate:"required,len=6"`
 }
 
 func (s *KeycardService) ChangePIN(args *ChangePINRequest, reply *struct{}) error {
@@ -108,12 +110,6 @@ func (s *KeycardService) ChangePIN(args *ChangePINRequest, reply *struct{}) erro
 	}
 
 	err := validateRequest(args)
-	if err != nil {
-		return err
-	}
-
-	// FIXME: Should we Verify the PIN, or client has to call it before?
-	err = s.keycardContext.VerifyPIN(args.CurrentPIN)
 	if err != nil {
 		return err
 	}

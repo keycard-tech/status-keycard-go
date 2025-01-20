@@ -23,9 +23,10 @@ const zeroTimeout = 0
 const pnpNotificationReader = `\\?PnP?\Notification`
 
 var (
+	errNotKeycard            = errors.New("card is not a keycard")
 	errKeycardNotConnected   = errors.New("keycard not connected")
 	errKeycardNotReady       = errors.New("keycard not ready")
-	errNotKeycard            = errors.New("card is not a keycard")
+	errKeycardNotAuthorized  = errors.New("keycard not authorized")
 	errKeycardNotInitialized = errors.New("keycard not initialized")
 )
 
@@ -152,7 +153,7 @@ func (kc *KeycardContextV2) monitorRoutine(ctx context.Context, logger *zap.Logg
 	//rs := append(readers, pnpReader)
 	//err = kc.cardCtx.GetStatusChange(rs, infiniteTimeout)
 
-	rs := append(readers)
+	rs := readers
 	err = kc.getStatusChange(ctx, rs, infiniteTimeout)
 	if err == scard.ErrCancelled && !kc.forceScan.Load() {
 		// Shutdown requested
@@ -166,21 +167,25 @@ func (kc *KeycardContextV2) monitorRoutine(ctx context.Context, logger *zap.Logg
 	return false
 }
 
+func (kc *KeycardContextV2) createTimer(timeout time.Duration) <-chan time.Time {
+	if timeout < 0 {
+		return nil
+	}
+
+	return time.After(timeout)
+}
+
 func (kc *KeycardContextV2) getStatusChange(ctx context.Context, readersStates ReadersStates, timeout time.Duration) error {
 	//return kc.cardCtx.GetStatusChange(readersStates, timeout)
 
-	timer := time.NewTimer(timeout)
-	if timeout < 0 {
-		timer.Stop() // FIXME: Will it stop, but not tick?
-	}
-
+	timer := kc.createTimer(timeout)
 	ticker := time.NewTicker(500 * time.Millisecond)
 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-timer.C:
+			return scard.ErrCancelled
+		case <-timer:
 			return scard.ErrTimeout
 		case <-ticker.C:
 			if len(readersStates) == 0 {
@@ -414,8 +419,24 @@ func (kc *KeycardContextV2) keycardConnected() bool {
 	return kc.cmdSet != nil
 }
 
-func (kc *KeycardContextV2) keycardReady() bool {
-	return kc.keycardConnected() && kc.status.State == Ready
+func (kc *KeycardContextV2) keycardReady() error {
+	if !kc.keycardConnected() {
+		return errKeycardNotConnected
+	}
+	if kc.status.State != Ready && kc.status.State != Authorized {
+		return errKeycardNotReady
+	}
+	return nil
+}
+
+func (kc *KeycardContextV2) keycardAuthorized() error {
+	if !kc.keycardConnected() {
+		return errKeycardNotConnected
+	}
+	if kc.status.State != Authorized {
+		return errKeycardNotAuthorized
+	}
+	return nil
 }
 
 func (kc *KeycardContextV2) checkSCardError(err error, context string) error {
@@ -501,6 +522,8 @@ func (kc *KeycardContextV2) VerifyPIN(pin string) error {
 		return errKeycardNotConnected
 	}
 
+	authorized := false
+
 	defer func() {
 		// Update app status to get the new pin remaining attempts
 		// Although we can parse the `err` as `keycard.WrongPINError`, it won't work for `err == nil`.
@@ -508,16 +531,20 @@ func (kc *KeycardContextV2) VerifyPIN(pin string) error {
 		if err != nil {
 			kc.logger.Error("failed to update app status after verifying pin")
 		}
+		if kc.status.State == Ready && authorized {
+			kc.status.State = Authorized
+		}
 		kc.publishStatus()
 	}()
 
 	err := kc.cmdSet.VerifyPIN(pin)
+	authorized = err == nil
 	return kc.checkSCardError(err, "VerifyPIN")
 }
 
 func (kc *KeycardContextV2) ChangePIN(pin string) error {
-	if !kc.keycardConnected() {
-		return errKeycardNotConnected
+	if err := kc.keycardAuthorized(); err != nil {
+		return err
 	}
 
 	defer func() {
@@ -550,8 +577,8 @@ func (kc *KeycardContextV2) UnblockPIN(puk string, newPIN string) error {
 }
 
 func (kc *KeycardContextV2) ChangePUK(puk string) error {
-	if !kc.keycardReady() {
-		return errKeycardNotReady
+	if err := kc.keycardAuthorized(); err != nil {
+		return err
 	}
 
 	defer func() {
@@ -567,8 +594,8 @@ func (kc *KeycardContextV2) ChangePUK(puk string) error {
 }
 
 func (kc *KeycardContextV2) GenerateMnemonic(mnemonicLength int) ([]int, error) {
-	if !kc.keycardReady() {
-		return nil, errKeycardNotReady
+	if err := kc.keycardReady(); err != nil {
+		return nil, err
 	}
 
 	indexes, err := kc.cmdSet.GenerateMnemonic(mnemonicLength / 3)
@@ -576,8 +603,8 @@ func (kc *KeycardContextV2) GenerateMnemonic(mnemonicLength int) ([]int, error) 
 }
 
 func (kc *KeycardContextV2) LoadMnemonic(mnemonic string, password string) ([]byte, error) {
-	if !kc.keycardReady() {
-		return nil, errKeycardNotReady
+	if err := kc.keycardAuthorized(); err != nil {
+		return nil, err
 	}
 
 	var keyUID []byte
@@ -673,8 +700,8 @@ func (kc *KeycardContextV2) exportKey(path string, exportOption uint8) (*KeyPair
 }
 
 func (kc *KeycardContextV2) ExportLoginKeys() (*LoginKeys, error) {
-	if !kc.keycardReady() {
-		return nil, errKeycardNotReady
+	if err := kc.keycardAuthorized(); err != nil {
+		return nil, err
 	}
 
 	var err error
@@ -694,8 +721,8 @@ func (kc *KeycardContextV2) ExportLoginKeys() (*LoginKeys, error) {
 }
 
 func (kc *KeycardContextV2) ExportRecoverKeys() (*RecoverKeys, error) {
-	if !kc.keycardReady() {
-		return nil, errKeycardNotReady
+	if err := kc.keycardAuthorized(); err != nil {
+		return nil, err
 	}
 
 	loginKeys, err := kc.ExportLoginKeys()
