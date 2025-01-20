@@ -15,6 +15,15 @@ var (
 	validate                    = validator.New()
 )
 
+func validateRequest(v interface{}) error {
+	err := validate.Struct(v)
+	if err != nil {
+		errs := err.(validator.ValidationErrors)
+		return goerrors.Join(errs)
+	}
+	return nil
+}
+
 type KeycardService struct {
 	keycardContext *internal.KeycardContextV2
 }
@@ -57,10 +66,9 @@ func (s *KeycardService) Initialize(args *InitializeRequest, reply *struct{}) er
 		return errKeycardServiceNotStarted
 	}
 
-	err := validate.Struct(args)
+	err := validateRequest(args)
 	if err != nil {
-		errs := err.(validator.ValidationErrors)
-		return goerrors.Join(errs)
+		return err
 	}
 
 	if args.PairingPassword == "" {
@@ -68,31 +76,6 @@ func (s *KeycardService) Initialize(args *InitializeRequest, reply *struct{}) er
 	}
 
 	err = s.keycardContext.Initialize(args.PIN, args.PUK, args.PairingPassword)
-	return err
-}
-
-type ChangePINRequest struct {
-	CurrentPIN string `json:"currentPin" validate:"required,len=6"`
-	NewPIN     string `json:"newPin" validate:"required,len=6"`
-}
-
-func (s *KeycardService) ChangePIN(args *ChangePINRequest, reply *struct{}) error {
-	if s.keycardContext == nil {
-		return errKeycardServiceNotStarted
-	}
-
-	err := validate.Struct(args)
-	if err != nil {
-		errs := err.(validator.ValidationErrors)
-		return goerrors.Join(errs)
-	}
-
-	err = s.keycardContext.VerifyPIN(args.CurrentPIN)
-	if err != nil {
-		return err
-	}
-
-	err = s.keycardContext.ChangePIN(args.NewPIN)
 	return err
 }
 
@@ -114,6 +97,49 @@ func (s *KeycardService) VerifyPIN(args *VerifyPINRequest, reply *VerifyPINRespo
 	return err
 }
 
+type ChangePINRequest struct {
+	CurrentPIN string `json:"currentPin" validate:"required,len=6"`
+	NewPIN     string `json:"newPin" validate:"required,len=6"`
+}
+
+func (s *KeycardService) ChangePIN(args *ChangePINRequest, reply *struct{}) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	err := validateRequest(args)
+	if err != nil {
+		return err
+	}
+
+	// FIXME: Should we Verify the PIN, or client has to call it before?
+	err = s.keycardContext.VerifyPIN(args.CurrentPIN)
+	if err != nil {
+		return err
+	}
+
+	err = s.keycardContext.ChangePIN(args.NewPIN)
+	return err
+}
+
+type ChangePUKRequest struct {
+	NewPUK string `json:"newPuk" validate:"required,len=12"`
+}
+
+func (s *KeycardService) ChangePUK(args *ChangePUKRequest, reply *struct{}) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	err := validateRequest(args)
+	if err != nil {
+		return err
+	}
+
+	err = s.keycardContext.ChangePUK(args.NewPUK)
+	return err
+}
+
 type UnblockRequest struct {
 	PUK    string `json:"puk" validate:"required,len=12"`
 	NewPIN string `json:"newPin" validate:"required,len=6"`
@@ -124,10 +150,9 @@ func (s *KeycardService) Unblock(args *UnblockRequest, reply *struct{}) error {
 		return errKeycardServiceNotStarted
 	}
 
-	err := validate.Struct(args)
+	err := validateRequest(args)
 	if err != nil {
-		errs := err.(validator.ValidationErrors)
-		return goerrors.Join(errs)
+		return err
 	}
 
 	err = s.keycardContext.UnblockPIN(args.PUK, args.NewPIN)
@@ -169,10 +194,9 @@ func (s *KeycardService) LoadMnemonic(args *LoadMnemonicRequest, reply *LoadMnem
 		return errKeycardServiceNotStarted
 	}
 
-	err := validate.Struct(args)
+	err := validateRequest(args)
 	if err != nil {
-		errs := err.(validator.ValidationErrors)
-		return goerrors.Join(errs)
+		return err
 	}
 
 	keyUID, err := s.keycardContext.LoadMnemonic(args.Mnemonic, args.Passphrase)
@@ -186,5 +210,19 @@ func (s *KeycardService) FactoryReset(args *struct{}, reply *struct{}) error {
 	}
 
 	err := s.keycardContext.FactoryReset()
+	return err
+}
+
+type GetMetadataResponse struct {
+	Metadata *internal.Metadata `json:"metadata"`
+}
+
+func (s *KeycardService) GetMetadata(args *struct{}, reply *GetMetadataResponse) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	metadata, err := s.keycardContext.GetMetadata()
+	reply.Metadata = metadata
 	return err
 }

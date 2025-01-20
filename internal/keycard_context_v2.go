@@ -22,8 +22,10 @@ const zeroTimeout = 0
 const pnpNotificationReader = `\\?PnP?\Notification`
 
 var (
-	errKeycardNotConnected = errors.New("keycard not connected")
-	errKeycardNotReady     = errors.New("keycard not ready")
+	errKeycardNotConnected   = errors.New("keycard not connected")
+	errKeycardNotReady       = errors.New("keycard not ready")
+	errNotKeycard            = errors.New("card is not a keycard")
+	errKeycardNotInitialized = errors.New("keycard not initialized")
 )
 
 type KeycardContextV2 struct {
@@ -127,23 +129,17 @@ func (kc *KeycardContextV2) monitorRoutine(ctx context.Context, logger *zap.Logg
 	readers, err := kc.getCurrentReadersState()
 	if err != nil {
 		logger.Error("failed to get readers state", zap.Error(err))
-		kc.status.Reset()
-		kc.status.State = InternalError
+		kc.status.Reset(InternalError)
 		kc.publishStatus()
 		return false
 	}
 
 	if readers.Empty() && kc.status.State != WaitingForReader {
-		kc.status.State = WaitingForReader
-		kc.status.AppInfo = nil
-		kc.status.AppStatus = nil
+		kc.status.Reset(WaitingForReader)
 		kc.publishStatus()
 	}
 
-	err = kc.scanReadersForKeycard(readers)
-	if err != nil {
-		logger.Error("failed to check readers", zap.Error(err))
-	}
+	kc.scanReadersForKeycard(readers)
 
 	// Wait for readers changes, including new readers
 	// https://blog.apdu.fr/posts/2024/08/improved-scardgetstatuschange-for-pnpnotification-special-reader/
@@ -242,17 +238,17 @@ func (kc *KeycardContextV2) getCurrentReadersState() (ReadersStates, error) {
 	return knownReaders, nil
 }
 
-func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) error {
+func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) {
 	if !kc.forceScan.Load() &&
 		kc.activeReader != "" &&
 		readers.Contains(kc.activeReader) &&
 		readers.ReaderHasCard(kc.activeReader) {
 		// active reader is not selected yet or is still present, no need to connect a card
-		return nil
+		return
 	}
 
 	if readers.Empty() {
-		return nil
+		return
 	}
 
 	kc.forceScan.Store(false)
@@ -261,24 +257,19 @@ func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) error {
 	readerWithCardIndex, ok := readers.ReaderWithCardIndex()
 	if !ok {
 		kc.logger.Debug("no card found on any readers")
-		kc.status.State = WaitingForCard
-		kc.status.AppInfo = nil
-		kc.status.AppStatus = nil
+		kc.status.Reset(WaitingForCard)
 		kc.publishStatus()
-		return nil
+		return
 	}
 
 	kc.logger.Debug("card found", zap.Int("index", readerWithCardIndex))
 
 	err := kc.connectKeycard(readers[readerWithCardIndex].Reader)
-	if err != nil {
+	if err != nil && !errors.Is(err, errNotKeycard) && !errors.Is(err, errKeycardNotInitialized) {
 		kc.logger.Error("failed to connect keycard", zap.Error(err))
-		kc.publishStatus()
-		return err
 	}
 
 	kc.publishStatus()
-	return nil
 }
 
 func (kc *KeycardContextV2) connectKeycard(reader string) error {
@@ -315,12 +306,12 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 
 	if !appInfo.Installed {
 		kc.status.State = NotKeycard
-		return errors.New("card is not a keycard")
+		return errNotKeycard
 	}
 
 	if !appInfo.Initialized {
 		kc.status.State = EmptyKeycard
-		return errors.New("keycard not initialized")
+		return errKeycardNotInitialized
 	}
 
 	kc.status.State = ConnectingCard
@@ -372,6 +363,11 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 	err = kc.updateApplicationStatus()
 	if err != nil {
 		return errors.Wrap(err, "failed to get application status")
+	}
+
+	err = kc.updateMetadata()
+	if err != nil {
+		return errors.Wrap(err, "failed to get metadata")
 	}
 
 	return nil
@@ -469,6 +465,16 @@ func (kc *KeycardContextV2) updateApplicationStatus() error {
 	return nil
 }
 
+func (kc *KeycardContextV2) updateMetadata() error {
+	metadata, err := kc.GetMetadata()
+	if err != nil {
+		return err
+	}
+
+	kc.status.Metadata = metadata
+	return nil
+}
+
 func (kc *KeycardContextV2) GetStatus() Status {
 	return *kc.status
 }
@@ -542,6 +548,23 @@ func (kc *KeycardContextV2) UnblockPIN(puk string, newPIN string) error {
 	return kc.checkSCardError(err, "UnblockPIN")
 }
 
+func (kc *KeycardContextV2) ChangePUK(puk string) error {
+	if !kc.keycardReady() {
+		return errKeycardNotReady
+	}
+
+	defer func() {
+		err := kc.updateApplicationStatus()
+		if err != nil {
+			kc.logger.Error("failed to update app status after changing pin")
+		}
+		kc.publishStatus()
+	}()
+
+	err := kc.cmdSet.ChangePUK(puk)
+	return kc.checkSCardError(err, "ChangePUK")
+}
+
 func (kc *KeycardContextV2) GenerateMnemonic(mnemonicLength int) ([]int, error) {
 	if !kc.keycardReady() {
 		return nil, errKeycardNotReady
@@ -556,8 +579,19 @@ func (kc *KeycardContextV2) LoadMnemonic(mnemonic string, password string) ([]by
 		return nil, errKeycardNotReady
 	}
 
+	var keyUID []byte
+	var err error
+
+	defer func() {
+		if err != nil {
+			return
+		}
+		kc.status.AppInfo.KeyUID = keyUID
+		kc.publishStatus()
+	}()
+
 	seed := kc.mnemonicToBinarySeed(mnemonic, password)
-	keyUID, err := kc.loadSeed(seed)
+	keyUID, err = kc.loadSeed(seed)
 	return keyUID, kc.checkSCardError(err, "LoadMnemonic")
 }
 
@@ -566,8 +600,7 @@ func (kc *KeycardContextV2) FactoryReset() error {
 		return errKeycardNotConnected
 	}
 
-	kc.status.Reset()
-	kc.status.State = FactoryResetting
+	kc.status.Reset(FactoryResetting)
 	kc.publishStatus()
 
 	kc.logger.Debug("factory reset")
@@ -577,3 +610,26 @@ func (kc *KeycardContextV2) FactoryReset() error {
 	kc.resetCardConnection(true)
 	return err
 }
+
+func (kc *KeycardContextV2) GetMetadata() (*Metadata, error) {
+	if !kc.keycardConnected() {
+		return nil, errKeycardNotConnected
+	}
+
+	data, err := kc.cmdSet.GetData(keycard.P1StoreDataPublic)
+	if err != nil {
+		return nil, kc.checkSCardError(err, "GetMetadata")
+	}
+
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	metadata, err := types.ParseMetadata(data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse metadata")
+	}
+
+	return ToMetadata(metadata), nil
+}
+

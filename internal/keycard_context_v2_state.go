@@ -28,16 +28,18 @@ type Status struct {
 	State     State                    `json:"state"`
 	AppInfo   *ApplicationInfoV2       `json:"keycardInfo"`
 	AppStatus *types.ApplicationStatus `json:"keycardStatus"`
+	Metadata  *Metadata                `json:"metadata"`
 }
 
 func NewStatus() *Status {
 	status := &Status{}
-	status.Reset()
+	status.Reset(UnknownReaderState)
 	return status
 }
 
-func (s *Status) Reset() {
-	s.State = UnknownReaderState
+func (s *Status) Reset(newState State) {
+	s.State = newState
 	s.AppInfo = nil
 	s.AppStatus = nil
+	s.Metadata = nil
 }
