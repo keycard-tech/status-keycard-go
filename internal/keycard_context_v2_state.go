@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"errors"
+
 	"github.com/status-im/keycard-go/types"
 )
 
@@ -47,4 +49,29 @@ func (s *Status) Reset(newState State) {
 
 func (s *Status) KeycardSupportsExtendedKeys() bool {
 	return s.AppInfo != nil && s.AppInfo.versionRaw >= 0x0310
+}
+
+var (
+	simulatedNoPCSC                 = errors.New("simulated-no-pcsc")
+	simulatedListReadersError       = errors.New("simulated-list-readers-error")
+	simulatedGetStatusChangeError   = errors.New("simulated-get-status-change-error")
+	simulatedCardConnectError       = errors.New("simulated-card-connect-error")
+	simulatedGetCardStatusError     = errors.New("simulated-get-card-status-error")
+	simulatedSelectAppletError      = errors.New("simulated-select-applet-error")
+	simulatedNotAKeycard            = errors.New("simulated-not-a-keycard")
+	simulatedOpenSecureChannelError = errors.New("simulated-open-secure-channel-error")
+)
+
+func GetSimulatedError(message string) error {
+	errs := map[string]error{
+		simulatedNoPCSC.Error():                 simulatedNoPCSC,
+		simulatedListReadersError.Error():       simulatedListReadersError,
+		simulatedGetStatusChangeError.Error():   simulatedGetStatusChangeError,
+		simulatedCardConnectError.Error():       simulatedCardConnectError,
+		simulatedGetCardStatusError.Error():     simulatedGetCardStatusError,
+		simulatedSelectAppletError.Error():      simulatedSelectAppletError,
+		simulatedNotAKeycard.Error():            simulatedNotAKeycard,
+		simulatedOpenSecureChannelError.Error(): simulatedOpenSecureChannelError,
+	}
+	return errs[message]
 }

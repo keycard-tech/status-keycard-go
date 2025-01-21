@@ -25,17 +25,28 @@ func validateRequest(v interface{}) error {
 }
 
 type KeycardService struct {
-	keycardContext *internal.KeycardContextV2
+	keycardContext        *internal.KeycardContextV2
+	simulateError         error
+	simulationInstanceUID string
 }
 
 type StartRequest struct {
-	StorageFilePath string `json:"storageFilePath"`
+	StorageFilePath string `json:"storageFilePath" validate:"required"`
 }
 
 func (s *KeycardService) Start(args *StartRequest, reply *struct{}) error {
 	var err error
 	s.keycardContext, err = internal.NewKeycardContextV2(args.StorageFilePath)
-	return err
+	if err != nil {
+		return err
+	}
+
+	err = s.keycardContext.SimulateError(s.simulateError, s.simulationInstanceUID)
+	if err != nil {
+		return err
+	}
+
+	return s.keycardContext.Start()
 }
 
 func (s *KeycardService) Stop(args *struct{}, reply *struct{}) error {
@@ -248,4 +259,29 @@ func (s *KeycardService) ExportRecoverKeys(args *struct{}, reply *ExportRecovere
 	var err error
 	reply.Keys, err = s.keycardContext.ExportRecoverKeys()
 	return err
+}
+
+type SimulateErrorRequest struct {
+	Error       string `json:"error"`
+	InstanceUID string `json:"instanceUID"`
+}
+
+func (s *KeycardService) SimulateError(args *SimulateErrorRequest, reply *struct{}) error {
+	err := validateRequest(args)
+	if err != nil {
+		return err
+	}
+
+	errToSimulate := internal.GetSimulatedError(args.Error)
+	if args.Error != "" && errToSimulate == nil {
+		return errors.New("unknown error to simulate")
+	}
+
+	if s.keycardContext == nil {
+		s.simulateError = errToSimulate
+		s.simulationInstanceUID = args.InstanceUID
+		return nil
+	}
+
+	return s.keycardContext.SimulateError(errToSimulate, args.InstanceUID)
 }

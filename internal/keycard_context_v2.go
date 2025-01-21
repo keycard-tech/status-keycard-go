@@ -18,9 +18,11 @@ import (
 	"github.com/status-im/status-keycard-go/signal"
 )
 
-const infiniteTimeout = -1
-const zeroTimeout = 0
-const pnpNotificationReader = `\\?PnP?\Notification`
+const (
+	infiniteTimeout = -1
+	zeroTimeout     = 0
+	monitoringTick  = 500 * time.Millisecond
+)
 
 var (
 	errNotKeycard            = errors.New("card is not a keycard")
@@ -39,6 +41,10 @@ type KeycardContextV2 struct {
 	pairings     *pairing.Store
 	status       *Status
 	activeReader string
+
+	// simulation options
+	simulatedError        error
+	simulationInstanceUID string
 }
 
 func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error) {
@@ -56,12 +62,17 @@ func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error
 		status:   NewStatus(),
 	}
 
-	err = kc.establishContext()
+	return kc, nil
+}
+
+func (kc *KeycardContextV2) Start() error {
+	err := kc.establishContext()
+	err = kc.simulateError(err, simulatedNoPCSC)
 	if err != nil {
 		kc.logger.Error("failed to establish context", zap.Error(err))
 		kc.status.State = NoPCSC
 		kc.publishStatus()
-		return nil, err
+		return err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -71,7 +82,7 @@ func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error
 	go kc.cardCommunicationRoutine(ctx)
 	kc.monitor(ctx)
 
-	return kc, nil
+	return nil
 }
 
 func (kc *KeycardContext) establishContext() error {
@@ -118,21 +129,44 @@ func (kc *KeycardContextV2) monitor(ctx context.Context) {
 		defer logger.Debug("monitor stopped")
 		// This goroutine will be stopped by cardCtx.Cancel()
 		for {
-			finish := kc.monitorRoutine(ctx, logger)
-			if finish {
+			ok := kc.monitorRoutine(ctx, logger)
+			if !ok {
 				return
 			}
 		}
 	}()
 }
 
+// monitorRoutine is the main routine that monitors the card readers and card changes.
+// It will be stopped by cardCtx.Cancel() or when the context is done.
+// Returns false if the monitoring should be stopped by the runner.
 func (kc *KeycardContextV2) monitorRoutine(ctx context.Context, logger *zap.Logger) bool {
+	logger.Debug("tick")
+
+	/*
+		Limitations:
+			- Only support 1 card at a time. Even if it's not a keycard, or connection failed.
+			- Limited support for multiple readers. Only the first found card is considered.
+				NOTE: Does it make senes to support multiple readers, if we can only connect to one card?
+
+		1. readers := ListReaders()
+		2. states := GetStatusChange(readers)
+		3. if states didn't change since last read, wait 500ms and go to (1)
+		4. if a card is present, connect to it
+		5. if connection failed, FIXME:
+		6. if not a keycard, WARNING:
+		7. if not initialized, WARNING:
+		8. listen only to activeReader changes
+	*/
+
 	// Get current readers list and state
 	readers, err := kc.getCurrentReadersState()
 	if err != nil {
 		logger.Error("failed to get readers state", zap.Error(err))
 		kc.status.Reset(InternalError)
 		kc.publishStatus()
+
+		// FIXME: wait 500 milliseconds
 		return false
 	}
 
@@ -143,9 +177,13 @@ func (kc *KeycardContextV2) monitorRoutine(ctx context.Context, logger *zap.Logg
 
 	kc.scanReadersForKeycard(readers)
 
-	// Wait for readers changes, including new readers
+	// NOTE: There're 2 approaches to wait for readers changes:
+	// 		 1. Periodically call `ListReaders` and compare the list of readers.
+	//		 2. Use `GetStatusChange` with a list of readers and a `PnP` reader.
+	//Wait for readers changes, including new readers
 	// https://blog.apdu.fr/posts/2024/08/improved-scardgetstatuschange-for-pnpnotification-special-reader/
 	// NOTE: The article states that MacOS is not supported, but works for me on MacOS 15.1.1 (24B91).
+	//pnpNotificationReader := `\\?PnP?\Notification`
 	//pnpReader := scard.ReaderState{
 	//	Reader:       pnpNotificationReader,
 	//	CurrentState: scard.StateUnaware,
@@ -153,64 +191,41 @@ func (kc *KeycardContextV2) monitorRoutine(ctx context.Context, logger *zap.Logg
 	//rs := append(readers, pnpReader)
 	//err = kc.cardCtx.GetStatusChange(rs, infiniteTimeout)
 
-	rs := readers
-	err = kc.getStatusChange(ctx, rs, infiniteTimeout)
+	err = kc.getActiveReaderChange(ctx, readers)
+
 	if err == scard.ErrCancelled && !kc.forceScan.Load() {
 		// Shutdown requested
-		return true
+		return false
 	}
+
 	if err != scard.ErrCancelled && err != nil {
 		logger.Error("failed to get status change", zap.Error(err))
 		return false
 	}
 
-	return false
+	return true
 }
 
-func (kc *KeycardContextV2) createTimer(timeout time.Duration) <-chan time.Time {
-	if timeout < 0 {
+func (kc *KeycardContextV2) getActiveReaderChange(ctx context.Context, readersStates ReadersStates) error {
+	if len(readersStates) == 0 {
+		select {
+		case <-ctx.Done():
+		case <-time.After(monitoringTick): // Pause for a while to avoid a busy loop
+		}
 		return nil
 	}
 
-	return time.After(timeout)
-}
-
-func (kc *KeycardContextV2) getStatusChange(ctx context.Context, readersStates ReadersStates, timeout time.Duration) error {
-	//return kc.cardCtx.GetStatusChange(readersStates, timeout)
-
-	timer := kc.createTimer(timeout)
-	ticker := time.NewTicker(500 * time.Millisecond)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return scard.ErrCancelled
-		case <-timer:
-			return scard.ErrTimeout
-		case <-ticker.C:
-			if len(readersStates) == 0 {
-				return nil
-			}
-			if kc.forceScan.Load() {
-				return scard.ErrCancelled
-			}
-
-			err := kc.cardCtx.GetStatusChange(readersStates, 100*time.Millisecond)
-			if err == scard.ErrTimeout {
-				break
-			}
-			if err != nil {
-				return err
-			}
-			if readersStates.HasChanges() {
-				return nil
-			}
-		}
+	err := kc.cardCtx.GetStatusChange(readersStates, monitoringTick)
+	if err != nil && err != scard.ErrTimeout {
+		return err
 	}
+
+	return nil
 }
 
 func (kc *KeycardContextV2) getCurrentReadersState() (ReadersStates, error) {
 	readers, err := kc.cardCtx.ListReaders()
+	err = kc.simulateError(err, simulatedListReadersError)
 	if err != nil {
 		return nil, err
 	}
@@ -226,6 +241,7 @@ func (kc *KeycardContextV2) getCurrentReadersState() (ReadersStates, error) {
 	}
 
 	err = kc.cardCtx.GetStatusChange(rs, zeroTimeout)
+	err = kc.simulateError(err, simulatedGetStatusChangeError)
 	if err != nil {
 		return nil, err
 	}
@@ -262,6 +278,9 @@ func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) {
 
 	readerWithCardIndex, ok := readers.ReaderWithCardIndex()
 	if !ok {
+		if kc.status.State == WaitingForCard {
+			return
+		}
 		kc.logger.Debug("no card found on any readers")
 		kc.status.Reset(WaitingForCard)
 		kc.publishStatus()
@@ -280,12 +299,14 @@ func (kc *KeycardContextV2) scanReadersForKeycard(readers ReadersStates) {
 
 func (kc *KeycardContextV2) connectKeycard(reader string) error {
 	card, err := kc.cardCtx.Connect(reader, scard.ShareShared, scard.ProtocolAny)
+	err = kc.simulateError(err, simulatedCardConnectError)
 	if err != nil {
 		kc.status.State = ConnectionError
 		return errors.Wrap(err, "failed to connect to card")
 	}
 
 	_, err = card.Status()
+	err = kc.simulateError(err, simulatedGetCardStatusError)
 	if err != nil {
 		kc.status.State = ConnectionError
 		return errors.Wrap(err, "failed to get card status")
@@ -299,20 +320,25 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 	// Card connected, now check if this is a keycard
 
 	appInfo, err := kc.selectApplet()
+	err = kc.simulateError(err, simulatedSelectAppletError)
 	if err != nil {
 		kc.status.State = ConnectionError
 		return errors.Wrap(err, "failed to select applet")
 	}
 
-	//
-	// NOTE: copy of openSC
-	//
+	// Check if 'not a keycard' simulation was requested for this card
+	simulatedError := kc.simulateError(nil, simulatedNotAKeycard)
+	keycardMatch := kc.simulationInstanceUID == appInfo.InstanceUID.String()
+	if simulatedError != nil && keycardMatch {
+		appInfo.Installed = false
+	}
 
+	// Save AppInfo
 	kc.status.AppInfo = appInfo
 
 	if !appInfo.Installed {
 		kc.status.State = NotKeycard
-		return errNotKeycard
+		return kc.simulateError(errNotKeycard, simulatedNotAKeycard)
 	}
 
 	if !appInfo.Initialized {
@@ -328,9 +354,6 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 	if pair == nil {
 		kc.logger.Debug("pairing not found, pairing now")
 
-		//
-		// NOTE: copy of pair
-		//
 		var pairingInfo *types.PairingInfo
 		pairingPassword := DefPairing
 		pairingInfo, err = kc.Pair(pairingPassword)
@@ -361,6 +384,7 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 	}
 
 	err = kc.OpenSecureChannel(pair.Index, pair.Key)
+	err = kc.simulateError(err, simulatedOpenSecureChannelError)
 	if err != nil {
 		kc.status.State = ConnectionError
 		return errors.Wrap(err, "failed to open secure channel")
@@ -380,7 +404,6 @@ func (kc *KeycardContextV2) connectKeycard(reader string) error {
 }
 
 func (kc *KeycardContextV2) resetCardConnection(forceRescan bool) {
-	kc.logger.Debug("reset card connection")
 	kc.activeReader = ""
 	kc.card = nil
 	kc.c = nil
@@ -759,4 +782,24 @@ func (kc *KeycardContextV2) ExportRecoverKeys() (*RecoverKeys, error) {
 	}
 
 	return keys, err
+}
+
+func (kc *KeycardContextV2) SimulateError(err error, instanceUID string) error {
+	// Ensure the error is one of the known errors to simulate
+	if err != nil {
+		if simulateErr := GetSimulatedError(err.Error()); simulateErr == nil {
+			return errors.New("unknown error to simulate")
+		}
+	}
+
+	kc.simulatedError = err
+	kc.simulationInstanceUID = instanceUID
+	return nil
+}
+
+func (kc *KeycardContextV2) simulateError(currentError, errorToSimulate error) error {
+	if errors.Is(kc.simulatedError, errorToSimulate) {
+		return errorToSimulate
+	}
+	return currentError
 }

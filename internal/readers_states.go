@@ -57,3 +57,11 @@ func (rs ReadersStates) HasChanges() bool {
 	}
 	return false
 }
+
+func (rs ReadersStates) Readers() []string {
+	readers := make([]string, 0, len(rs))
+	for _, state := range rs {
+		readers = append(readers, state.Reader)
+	}
+	return readers
+}
