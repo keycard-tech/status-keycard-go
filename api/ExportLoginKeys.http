@@ -1,0 +1,8 @@
+# @name ExportLoginKeys
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.ExportLoginKeys",
+    "params": []
+}

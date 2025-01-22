@@ -1,0 +1,3 @@
+# @name Signals
+WEBSOCKET ws://{{address}}/signals
+Content-Type: application/json

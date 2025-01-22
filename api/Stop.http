@@ -1,0 +1,8 @@
+# @name Stop
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.Stop",
+    "params": []
+}

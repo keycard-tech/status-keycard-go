@@ -1,0 +1,13 @@
+# @name Initialize
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.Initialize",
+    "params": [
+        {
+            "pin": "654321",
+            "puk": "654321654321"
+        }
+    ]
+}

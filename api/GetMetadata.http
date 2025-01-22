@@ -1,0 +1,8 @@
+# @name FactoryReset
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.GetMetadata",
+    "params": []
+}

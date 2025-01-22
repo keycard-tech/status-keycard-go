@@ -1,0 +1,8 @@
+# @name GetStatus
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.GetStatus",
+    "params": []
+}

@@ -1,0 +1,13 @@
+# @name SimulateError
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.SimulateError",
+    "params": [
+        {
+            "instanceUID": "",
+            "error": "simulated-card-connect-error"
+        }
+    ]
+}

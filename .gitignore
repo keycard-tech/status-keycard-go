@@ -3,3 +3,4 @@
 /keycard
 /build
 /status-keycard-go
+/api/http-client.private.env.json
