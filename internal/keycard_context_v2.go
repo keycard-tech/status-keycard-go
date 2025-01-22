@@ -308,7 +308,7 @@ func (kc *KeycardContextV2) watchActiveReader(ctx context.Context, activeReader 
 	}
 
 	for {
-		err := kc.cardCtx.GetStatusChange(readersStates, infiniteTimeout)
+		err := kc.cardCtx.GetStatusChange(readersStates, zeroTimeout)
 
 		if err == scard.ErrCancelled {
 			if kc.forceScan.Load() {
@@ -317,7 +317,7 @@ func (kc *KeycardContextV2) watchActiveReader(ctx context.Context, activeReader 
 			return
 		}
 
-		if err != nil {
+		if err != nil && err != scard.ErrTimeout {
 			kc.logger.Error("failed to get status change", zap.Error(err))
 			return
 		}
@@ -328,6 +328,13 @@ func (kc *KeycardContextV2) watchActiveReader(ctx context.Context, activeReader 
 		}
 
 		readersStates.Update()
+
+		// NOTE: Would be better to use `GetStatusChange` with infinite timeout.
+		// 		 This worked perfectly on MacOS, but not on Linux. So we poll the reader state instead.
+		select {
+		case <-ctx.Done():
+		case <-time.After(monitoringTick): // Pause for a while to avoid a busy loop
+		}
 	}
 
 	kc.startDetectionLoop(ctx)
