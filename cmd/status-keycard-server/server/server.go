@@ -4,17 +4,19 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
+
 	"github.com/gorilla/websocket"
 
 	"github.com/pkg/errors"
 
-	"github.com/status-im/status-keycard-go/pkg/session"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-keycard-go/pkg/session"
 	"github.com/status-im/status-keycard-go/signal"
-	"os"
 )
 
 type Server struct {
@@ -72,7 +74,6 @@ func (s *Server) signalHandler(data []byte) {
 
 		err = connection.WriteMessage(websocket.TextMessage, data)
 		if err != nil {
-			s.logger.Error("failed to write signal message", zap.Error(err))
 			deleteConnection(connection)
 		}
 	}

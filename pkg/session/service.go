@@ -35,6 +35,10 @@ type StartRequest struct {
 }
 
 func (s *KeycardService) Start(args *StartRequest, reply *struct{}) error {
+	if s.keycardContext != nil {
+		return errors.New("keycard service already started")
+	}
+
 	var err error
 	s.keycardContext, err = internal.NewKeycardContextV2(args.StorageFilePath)
 	if err != nil {

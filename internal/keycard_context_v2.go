@@ -419,14 +419,19 @@ func (kc *KeycardContextV2) publishStatus() {
 }
 
 func (kc *KeycardContextV2) Stop() {
-	close(kc.forceScanC)
+	if kc.forceScanC != nil {
+		close(kc.forceScanC)
+	}
+
 	if kc.cardCtx != nil {
 		err := kc.cardCtx.Cancel()
 		if err != nil {
 			kc.logger.Error("failed to cancel context", zap.Error(err))
 		}
 	}
+
 	kc.KeycardContext.Stop()
+
 	if kc.shutdown != nil {
 		kc.shutdown()
 	}
