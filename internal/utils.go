@@ -86,6 +86,18 @@ func ToAppInfoV2(r *ktypes.ApplicationInfo) *ApplicationInfoV2 {
 	}
 }
 
+func ToAppStatus(r *ktypes.ApplicationStatus) *ApplicationStatus {
+	if r == nil {
+		return nil
+	}
+	return &ApplicationStatus{
+		RemainingAttemptsPIN: r.PinRetryCount,
+		RemainingAttemptsPUK: r.PUKRetryCount,
+		KeyInitialized:       r.KeyInitialized,
+		Path:                 r.Path,
+	}
+}
+
 func ToSignature(r *ktypes.Signature) *Signature {
 	return &Signature{
 		R: r.R(),

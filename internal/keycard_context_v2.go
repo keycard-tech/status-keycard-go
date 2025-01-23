@@ -480,7 +480,6 @@ func (kc *KeycardContextV2) checkSCardError(err error, context string) error {
 func (kc *KeycardContextV2) selectApplet() (*ApplicationInfoV2, error) {
 	info, err := kc.SelectApplet()
 	if err != nil {
-		kc.status.State = ConnectionError
 		return nil, err
 	}
 
@@ -489,7 +488,7 @@ func (kc *KeycardContextV2) selectApplet() (*ApplicationInfoV2, error) {
 
 func (kc *KeycardContextV2) updateApplicationStatus() error {
 	appStatus, err := kc.cmdSet.GetStatusApplication()
-	kc.status.AppStatus = appStatus
+	kc.status.AppStatus = ToAppStatus(appStatus)
 
 	if err != nil {
 		kc.status.State = ConnectionError

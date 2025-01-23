@@ -2,8 +2,6 @@ package internal
 
 import (
 	"errors"
-
-	"github.com/status-im/keycard-go/types"
 )
 
 type State string
@@ -28,10 +26,10 @@ const (
 )
 
 type Status struct {
-	State     State                    `json:"state"`
-	AppInfo   *ApplicationInfoV2       `json:"keycardInfo"`
-	AppStatus *types.ApplicationStatus `json:"keycardStatus"`
-	Metadata  *Metadata                `json:"metadata"`
+	State     State              `json:"state"`
+	AppInfo   *ApplicationInfoV2 `json:"keycardInfo"`
+	AppStatus *ApplicationStatus `json:"keycardStatus"`
+	Metadata  *Metadata          `json:"metadata"`
 }
 
 func NewStatus() *Status {

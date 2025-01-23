@@ -33,6 +33,13 @@ type ApplicationInfoV2 struct {
 	KeyUID utils.HexString `json:"keyUID"`
 }
 
+type ApplicationStatus struct {
+	RemainingAttemptsPIN int    `json:"remainingAttemptsPIN"`
+	RemainingAttemptsPUK int    `json:"remainingAttemptsPUK"`
+	KeyInitialized       bool   `json:"keyInitialized"`
+	Path                 string `json:"path"`
+}
+
 type KeyPair struct {
 	Address    string          `json:"address"`
 	PublicKey  utils.HexString `json:"publicKey"`
