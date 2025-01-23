@@ -122,7 +122,7 @@ The main field is `state`
 ### State
 
 Check the source code for the list of possible states and their description.
-https://github.com/keycard-tech/status-keycard-go/blob/a3804cc8848a93a277895e508dd7c423f1f8338c/internal/keycard_context_v2_state.go#L11-L73
+https://github.com/keycard-tech/status-keycard-go/blob/75b1c9eac08de708724e2ee36909764fcafa858e/internal/keycard_context_v2_state.go#L9-L71
 
 ## Commands
 
