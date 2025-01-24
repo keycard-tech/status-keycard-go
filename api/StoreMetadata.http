@@ -1,0 +1,15 @@
+# @name StoreMetadata
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.StoreMetadata",
+    "params": [
+        {
+            "name": "{{$timestamp}}",
+            "paths": [
+                "m/44'/60'/0'/0/1"
+            ]
+        }
+    ]
+}

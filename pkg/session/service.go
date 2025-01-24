@@ -237,6 +237,24 @@ func (s *KeycardService) GetMetadata(args *struct{}, reply *GetMetadataResponse)
 	return err
 }
 
+type StoreMetadataRequest struct {
+	Name  string   `json:"name" validate:"required"`
+	Paths []string `json:"paths" validate:""`
+}
+
+func (s *KeycardService) StoreMetadata(args *StoreMetadataRequest, reply *struct{}) error {
+	if s.keycardContext == nil {
+		return errKeycardServiceNotStarted
+	}
+
+	err := validateRequest(args)
+	if err != nil {
+		return err
+	}
+
+	return s.keycardContext.StoreMetadata(args.Name, args.Paths)
+}
+
 type ExportLoginKeysResponse struct {
 	Keys *internal.LoginKeys `json:"keys"`
 }

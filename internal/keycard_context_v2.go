@@ -2,13 +2,16 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/ebfe/scard"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/status-im/keycard-go"
+	"github.com/status-im/keycard-go/derivationpath"
 	"github.com/status-im/keycard-go/io"
 	"github.com/status-im/keycard-go/types"
 	"go.uber.org/zap"
@@ -97,6 +100,8 @@ func (kc *KeycardContextV2) cardCommunicationRoutine(ctx context.Context) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
+	kc.logger.Debug("card communication routine started")
+
 	defer func() {
 		kc.logger.Debug("card communication routine stopped")
 		err := kc.cardCtx.Release()
@@ -106,7 +111,6 @@ func (kc *KeycardContextV2) cardCommunicationRoutine(ctx context.Context) {
 	}()
 
 	for {
-		kc.logger.Debug("card communication routine started")
 		select {
 		case <-ctx.Done():
 			return
@@ -685,6 +689,56 @@ func (kc *KeycardContextV2) GetMetadata() (*Metadata, error) {
 	}
 
 	return ToMetadata(metadata), nil
+}
+
+func (kc KeycardContextV2) parsePaths(paths []string) ([]uint32, error) {
+	parsedPaths := make([]uint32, len(paths))
+	for i, path := range paths {
+		if !strings.HasPrefix(path, WalletRoothPath) {
+			return nil, fmt.Errorf("path '%s' does not start with wallet path '%s'", path, WalletRoothPath)
+		}
+
+		_, components, err := derivationpath.Decode(path)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse path '%s'", path)
+		}
+
+		// Store only the last part of the component, ignoring the common prefix
+		parsedPaths[i] = components[len(components)-1]
+	}
+	return parsedPaths, nil
+}
+
+func (kc *KeycardContextV2) StoreMetadata(name string, paths []string) (err error) {
+	if err = kc.keycardAuthorized(); err != nil {
+		return err
+	}
+
+	pathComponents, err := kc.parsePaths(paths)
+	if err != nil {
+		return err
+	}
+
+	metadata, err := types.NewMetadata(name, pathComponents)
+	if err != nil {
+		return errors.Wrap(err, "failed to create metadata")
+	}
+
+	defer func() {
+		if err != nil {
+			return
+		}
+
+		err = kc.updateMetadata()
+		if err != nil {
+			return
+		}
+
+		kc.publishStatus()
+	}()
+
+	err = kc.cmdSet.StoreData(keycard.P1StoreDataPublic, metadata.Serialize())
+	return kc.checkSCardError(err, "StoreMetadata")
 }
 
 func (kc *KeycardContextV2) exportedKeyToAddress(key *types.ExportedKey) (string, error) {

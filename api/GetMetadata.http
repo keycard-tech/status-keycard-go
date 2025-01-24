@@ -1,4 +1,4 @@
-# @name FactoryReset
+# @name GetMetadata
 POST {{address}}/rpc
 
 {
