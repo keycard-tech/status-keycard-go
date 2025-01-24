@@ -97,7 +97,16 @@ func (kc *KeycardContextV2) cardCommunicationRoutine(ctx context.Context) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
+	defer func() {
+		kc.logger.Debug("card communication routine stopped")
+		err := kc.cardCtx.Release()
+		if err != nil {
+			kc.logger.Error("failed to release context", zap.Error(err))
+		}
+	}()
+
 	for {
+		kc.logger.Debug("card communication routine started")
 		select {
 		case <-ctx.Done():
 			return
@@ -139,8 +148,6 @@ func (kc *KeycardContextV2) startDetectionLoop(ctx context.Context) {
 // It will be stopped by cardCtx.Cancel() or when the context is done.
 // Returns false if the monitoring should be stopped by the runner.
 func (kc *KeycardContextV2) detectionRoutine(ctx context.Context, logger *zap.Logger) bool {
-	logger.Debug("detection tick")
-
 	// Get current readers list and state
 	readers, err := kc.getCurrentReadersState()
 	if err != nil {
@@ -162,8 +169,6 @@ func (kc *KeycardContextV2) detectionRoutine(ctx context.Context, logger *zap.Lo
 	if err != nil {
 		logger.Error("failed to connect card", zap.Error(err))
 	}
-
-	kc.resetCardConnection()
 
 	// Wait for readers changes, including new readers
 	// https://blog.apdu.fr/posts/2024/08/improved-scardgetstatuschange-for-pnpnotification-special-reader/
@@ -212,7 +217,7 @@ func (kc *KeycardContextV2) connectCard(ctx context.Context, readers ReadersStat
 	kc.logger.Debug("card found", zap.Int("index", readerWithCardIndex))
 	activeReader := readers[readerWithCardIndex]
 
-	card, err := kc.cardCtx.Connect(activeReader.Reader, scard.ShareShared, scard.ProtocolAny)
+	card, err := kc.cardCtx.Connect(activeReader.Reader, scard.ShareExclusive, scard.ProtocolAny)
 	err = kc.simulateError(err, simulatedCardConnectError)
 	if err != nil {
 		kc.status.State = ConnectionError
@@ -403,6 +408,14 @@ func (kc *KeycardContextV2) connectKeycard() error {
 }
 
 func (kc *KeycardContextV2) resetCardConnection() {
+	if kc.card != nil {
+		err := kc.card.Disconnect(scard.LeaveCard)
+
+		if err != nil {
+			kc.logger.Error("failed to disconnect card", zap.Error(err))
+		}
+	}
+
 	kc.card = nil
 	kc.c = nil
 	kc.cmdSet = nil

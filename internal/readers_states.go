@@ -21,7 +21,7 @@ func (rs ReadersStates) Update() {
 
 func (rs ReadersStates) ReaderWithCardIndex() (int, bool) {
 	for i := range rs {
-		if rs[i].EventState&scard.StatePresent == 0 {
+		if rs[i].EventState&scard.StatePresent == 0 || rs[i].EventState&scard.StateExclusive != 0 {
 			continue
 		}
 
