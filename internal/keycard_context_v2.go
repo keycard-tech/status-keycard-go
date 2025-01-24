@@ -27,7 +27,6 @@ const (
 )
 
 var (
-	errNotAKeycard          = errors.New("not a keycard")
 	errKeycardNotConnected  = errors.New("keycard not connected")
 	errKeycardNotReady      = errors.New("keycard not ready")
 	errKeycardNotAuthorized = errors.New("keycard not authorized")

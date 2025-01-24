@@ -2,14 +2,15 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/status-im/status-keycard-go/cmd/status-keycard-server/server"
 	"go.uber.org/zap"
-	"fmt"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/status-im/status-keycard-go/cmd/status-keycard-server/server"
 )
 
 var (
@@ -54,6 +55,6 @@ func handleInterrupts() {
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(ch)
 
-	_ = <-ch
+	<-ch
 	os.Exit(0)
 }
