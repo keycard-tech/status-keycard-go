@@ -33,12 +33,11 @@ var (
 type KeycardContextV2 struct {
 	KeycardContext
 
-	shutdown     func()
-	forceScanC   chan struct{}
-	logger       *zap.Logger
-	pairings     *pairing.Store
-	status       *Status
-	readersState ReadersStates
+	shutdown   func()
+	forceScanC chan struct{}
+	logger     *zap.Logger
+	pairings   *pairing.Store
+	status     *Status
 
 	// simulation options
 	simulatedError        error
@@ -122,9 +121,9 @@ func (kc *KeycardContextV2) startDetectionLoop(ctx context.Context) {
 	}
 
 	logger := kc.logger.Named("detect")
-	logger.Debug("detect started")
 
 	go func() {
+		logger.Debug("detect started")
 		defer logger.Debug("detect stopped")
 		// This goroutine will be stopped by cardCtx.Cancel()
 		for {
@@ -762,6 +761,7 @@ func (kc *KeycardContextV2) ExportRecoverKeys() (*RecoverKeys, error) {
 		return nil, err
 	}
 
+	// NOTE: In theory, if P2ExportKeyExtendedPublic is used, then we don't need to export the wallet key separately.
 	keys.WalletKey, err = kc.exportKey(WalletPath, keycard.P2ExportKeyPublicOnly)
 	if err != nil {
 		return nil, err
