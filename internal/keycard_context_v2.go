@@ -27,9 +27,11 @@ const (
 )
 
 var (
-	errKeycardNotConnected  = errors.New("keycard not connected")
-	errKeycardNotReady      = errors.New("keycard not ready")
-	errKeycardNotAuthorized = errors.New("keycard not authorized")
+	errKeycardNotConnected   = errors.New("keycard not connected")
+	errKeycardNotInitialized = errors.New("keycard not initialized")
+	errKeycardNotReady       = errors.New("keycard not ready")
+	errKeycardNotAuthorized  = errors.New("keycard not authorized")
+	errKeycardNotBlocked     = errors.New("keycard not blocked")
 )
 
 type KeycardContextV2 struct {
@@ -163,7 +165,7 @@ func (kc *KeycardContextV2) detectionRoutine(ctx context.Context, logger *zap.Lo
 	if card != nil {
 		err = kc.connectKeycard()
 		if err != nil {
-			logger.Error("failed to connect card", zap.Error(err))
+			logger.Error("failed to connect keycard", zap.Error(err))
 		}
 		go kc.watchActiveReader(ctx, card.readerState)
 		return false
@@ -440,9 +442,19 @@ func (kc *KeycardContextV2) keycardConnected() bool {
 	return kc.cmdSet != nil
 }
 
-func (kc *KeycardContextV2) keycardReady() error {
+func (kc *KeycardContextV2) keycardInitialized() error {
 	if !kc.keycardConnected() {
 		return errKeycardNotConnected
+	}
+	if kc.status.State == EmptyKeycard {
+		return errKeycardNotInitialized
+	}
+	return nil
+}
+
+func (kc *KeycardContextV2) keycardReady() error {
+	if err := kc.keycardInitialized(); err != nil {
+		return err
 	}
 	if kc.status.State != Ready && kc.status.State != Authorized {
 		return errKeycardNotReady
@@ -451,8 +463,8 @@ func (kc *KeycardContextV2) keycardReady() error {
 }
 
 func (kc *KeycardContextV2) keycardAuthorized() error {
-	if !kc.keycardConnected() {
-		return errKeycardNotConnected
+	if err := kc.keycardInitialized(); err != nil {
+		return err
 	}
 	if kc.status.State != Authorized {
 		return errKeycardNotAuthorized
@@ -579,8 +591,12 @@ func (kc *KeycardContextV2) ChangePIN(pin string) error {
 }
 
 func (kc *KeycardContextV2) UnblockPIN(puk string, newPIN string) (err error) {
-	if !kc.keycardConnected() {
-		return errKeycardNotConnected
+	if err = kc.keycardInitialized(); err != nil {
+		return err
+	}
+
+	if kc.status.State != BlockedPIN {
+		return errKeycardNotBlocked
 	}
 
 	defer func() {
@@ -653,8 +669,8 @@ func (kc *KeycardContextV2) FactoryReset() error {
 }
 
 func (kc *KeycardContextV2) GetMetadata() (*Metadata, error) {
-	if !kc.keycardConnected() {
-		return nil, errKeycardNotConnected
+	if err := kc.keycardReady(); err != nil {
+		return nil, err
 	}
 
 	data, err := kc.cmdSet.GetData(keycard.P1StoreDataPublic)
