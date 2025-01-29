@@ -25,9 +25,8 @@ func validateRequest(v interface{}) error {
 }
 
 type KeycardService struct {
-	keycardContext        *internal.KeycardContextV2
-	simulateError         error
-	simulationInstanceUID string
+	keycardContext *internal.KeycardContextV2
+	simulateError  error
 }
 
 type StartRequest struct {
@@ -45,7 +44,7 @@ func (s *KeycardService) Start(args *StartRequest, reply *struct{}) error {
 		return err
 	}
 
-	err = s.keycardContext.SimulateError(s.simulateError, s.simulationInstanceUID)
+	err = s.keycardContext.SimulateError(s.simulateError)
 	if err != nil {
 		return err
 	}
@@ -284,8 +283,7 @@ func (s *KeycardService) ExportRecoverKeys(args *struct{}, reply *ExportRecovere
 }
 
 type SimulateErrorRequest struct {
-	Error       string `json:"error"`
-	InstanceUID string `json:"instanceUID"`
+	Error string `json:"error"`
 }
 
 func (s *KeycardService) SimulateError(args *SimulateErrorRequest, reply *struct{}) error {
@@ -299,11 +297,11 @@ func (s *KeycardService) SimulateError(args *SimulateErrorRequest, reply *struct
 		return errors.New("unknown error to simulate")
 	}
 
+	s.simulateError = errToSimulate
+
 	if s.keycardContext == nil {
-		s.simulateError = errToSimulate
-		s.simulationInstanceUID = args.InstanceUID
 		return nil
 	}
 
-	return s.keycardContext.SimulateError(errToSimulate, args.InstanceUID)
+	return s.keycardContext.SimulateError(errToSimulate)
 }

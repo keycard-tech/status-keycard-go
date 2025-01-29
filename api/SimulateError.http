@@ -6,8 +6,7 @@ POST {{address}}/rpc
     "method": "keycard.SimulateError",
     "params": [
         {
-            "instanceUID": "",
-            "error": "simulated-card-connect-error"
+            "error": "simulated-no-pcsc"
         }
     ]
 }

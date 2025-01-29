@@ -95,13 +95,30 @@ func (s *Status) KeycardSupportsExtendedKeys() bool {
 }
 
 var (
-	simulatedNoPCSC                 = errors.New("simulated-no-pcsc")
-	simulatedListReadersError       = errors.New("simulated-list-readers-error")
-	simulatedGetStatusChangeError   = errors.New("simulated-get-status-change-error")
-	simulatedCardConnectError       = errors.New("simulated-card-connect-error")
-	simulatedGetCardStatusError     = errors.New("simulated-get-card-status-error")
-	simulatedSelectAppletError      = errors.New("simulated-select-applet-error")
-	simulatedNotAKeycard            = errors.New("simulated-not-a-keycard")
+	// simulatedNoPCSC simulates failure in PCSC check.
+	// Call Start to trigger.
+	simulatedNoPCSC = errors.New("simulated-no-pcsc")
+
+	// simulatedListReadersError simulates a failure when trying to list readers.
+	// Connect a reader to trigger. Results in `InternalError` state.
+	simulatedListReadersError = errors.New("simulated-list-readers-error")
+
+	// simulatedGetStatusChangeError simulates a failure when trying to get status change.
+	// Connect a reader to trigger. Results in `InternalError` state.
+	simulatedGetStatusChangeError = errors.New("simulated-get-status-change-error")
+
+	// simulatedNotAKeycard simulates a card connection issue.
+	// Insert a card to trigger. Results in `ConnectionError` state.
+	simulatedCardConnectError = errors.New("simulated-card-connect-error")
+
+	// simulatedSelectAppletError simulates a failure when trying to select the applet.
+	// Insert the keycard to trigger. Results in `ConnectionError` state.
+	simulatedSelectAppletError = errors.New("simulated-select-applet-error")
+
+	// simulatedOpenSecureChannelError happens when trying to open a secure channel with the keycard.
+	// The keycard must be initialized and paired to open a secure channel, so if not initialized,
+	// or in case of a pairing issue, this error will not occur.
+	// Insert an initialized card to trigger. Results in `ConnectionError` state.
 	simulatedOpenSecureChannelError = errors.New("simulated-open-secure-channel-error")
 )
 
@@ -111,9 +128,6 @@ func GetSimulatedError(message string) error {
 		simulatedListReadersError.Error():       simulatedListReadersError,
 		simulatedGetStatusChangeError.Error():   simulatedGetStatusChangeError,
 		simulatedCardConnectError.Error():       simulatedCardConnectError,
-		simulatedGetCardStatusError.Error():     simulatedGetCardStatusError,
-		simulatedSelectAppletError.Error():      simulatedSelectAppletError,
-		simulatedNotAKeycard.Error():            simulatedNotAKeycard,
 		simulatedOpenSecureChannelError.Error(): simulatedOpenSecureChannelError,
 	}
 	return errs[message]

@@ -42,8 +42,7 @@ type KeycardContextV2 struct {
 	status     *Status
 
 	// simulation options
-	simulatedError        error
-	simulationInstanceUID string
+	simulatedError error
 }
 
 func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error) {
@@ -220,22 +219,14 @@ func (kc *KeycardContextV2) connectCard(ctx context.Context, readers ReadersStat
 	kc.logger.Debug("card found", zap.Int("index", readerWithCardIndex))
 	activeReader := readers[readerWithCardIndex]
 
-	card, err := kc.cardCtx.Connect(activeReader.Reader, scard.ShareExclusive, scard.ProtocolAny)
+	var err error
+	kc.card, err = kc.cardCtx.Connect(activeReader.Reader, scard.ShareExclusive, scard.ProtocolAny)
 	err = kc.simulateError(err, simulatedCardConnectError)
 	if err != nil {
 		kc.status.State = ConnectionError
 		return nil, errors.Wrap(err, "failed to connect to card")
 	}
 
-	// FIXME: Do we actually need to get card status?
-	_, err = card.Status()
-	err = kc.simulateError(err, simulatedGetCardStatusError)
-	if err != nil {
-		kc.status.State = ConnectionError
-		return nil, errors.Wrap(err, "failed to get card status")
-	}
-
-	kc.card = card
 	kc.c = io.NewNormalChannel(kc)
 	kc.cmdSet = keycard.NewCommandSet(kc.c)
 
@@ -245,13 +236,6 @@ func (kc *KeycardContextV2) connectCard(ctx context.Context, readers ReadersStat
 	if err != nil {
 		kc.status.State = ConnectionError
 		return nil, errors.Wrap(err, "failed to select applet")
-	}
-
-	// Check if 'not a keycard' simulation was requested for this card
-	simulatedError := kc.simulateError(nil, simulatedNotAKeycard)
-	keycardMatch := kc.simulationInstanceUID == appInfo.InstanceUID.String()
-	if simulatedError != nil && keycardMatch {
-		appInfo.Installed = false
 	}
 
 	// Save AppInfo
@@ -841,7 +825,7 @@ func (kc *KeycardContextV2) ExportRecoverKeys() (*RecoverKeys, error) {
 	return keys, err
 }
 
-func (kc *KeycardContextV2) SimulateError(err error, instanceUID string) error {
+func (kc *KeycardContextV2) SimulateError(err error) error {
 	// Ensure the error is one of the known errors to simulate
 	if err != nil {
 		if simulateErr := GetSimulatedError(err.Error()); simulateErr == nil {
@@ -850,13 +834,18 @@ func (kc *KeycardContextV2) SimulateError(err error, instanceUID string) error {
 	}
 
 	kc.simulatedError = err
-	kc.simulationInstanceUID = instanceUID
 	return nil
 }
 
 func (kc *KeycardContextV2) simulateError(currentError, errorToSimulate error) error {
-	if errors.Is(kc.simulatedError, errorToSimulate) {
-		return errorToSimulate
+	if !errors.Is(kc.simulatedError, errorToSimulate) {
+		return currentError
 	}
-	return currentError
+	switch errorToSimulate {
+	case simulatedCardConnectError:
+		fallthrough
+	case simulatedSelectAppletError:
+		kc.resetCardConnection() // Make it look like we never connected
+	}
+	return errorToSimulate
 }
