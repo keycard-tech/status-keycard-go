@@ -128,6 +128,7 @@ func GetSimulatedError(message string) error {
 		simulatedListReadersError.Error():       simulatedListReadersError,
 		simulatedGetStatusChangeError.Error():   simulatedGetStatusChangeError,
 		simulatedCardConnectError.Error():       simulatedCardConnectError,
+		simulatedSelectAppletError.Error():      simulatedSelectAppletError,
 		simulatedOpenSecureChannelError.Error(): simulatedOpenSecureChannelError,
 	}
 	return errs[message]
