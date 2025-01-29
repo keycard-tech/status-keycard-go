@@ -1,0 +1,12 @@
+# @name SimulateError
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.SimulateError",
+    "params": [
+        {
+            "error": "simulated-no-pcsc"
+        }
+    ]
+}

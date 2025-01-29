@@ -20,6 +20,26 @@ type ApplicationInfo struct {
 	KeyUID utils.HexString `json:"keyUID"`
 }
 
+// ApplicationInfoV2 is the same as ApplicationInfo but with a string version field.
+type ApplicationInfoV2 struct {
+	Installed      bool            `json:"installed"`
+	Initialized    bool            `json:"initialized"`
+	InstanceUID    utils.HexString `json:"instanceUID"`
+	versionRaw     int             `json:"-"`
+	Version        string          `json:"version"`
+	AvailableSlots int             `json:"availableSlots"`
+	// KeyUID is the sha256 of the master public key on the card.
+	// It's empty if the card doesn't contain any key.
+	KeyUID utils.HexString `json:"keyUID"`
+}
+
+type ApplicationStatus struct {
+	RemainingAttemptsPIN int    `json:"remainingAttemptsPIN"`
+	RemainingAttemptsPUK int    `json:"remainingAttemptsPUK"`
+	KeyInitialized       bool   `json:"keyInitialized"`
+	Path                 string `json:"path"`
+}
+
 type KeyPair struct {
 	Address    string          `json:"address"`
 	PublicKey  utils.HexString `json:"publicKey"`
@@ -36,4 +56,17 @@ type Wallet struct {
 type Metadata struct {
 	Name    string   `json:"name"`
 	Wallets []Wallet `json:"wallets"`
+}
+
+type LoginKeys struct {
+	EncryptionPrivateKey *KeyPair `json:"encryptionPrivateKey"`
+	WhisperPrivateKey    *KeyPair `json:"whisperPrivateKey"`
+}
+
+type RecoverKeys struct {
+	LoginKeys
+	EIP1581key    *KeyPair `json:"eip1581"`
+	WalletRootKey *KeyPair `json:"walletRootKey"`
+	WalletKey     *KeyPair `json:"walletKey"`
+	MasterKey     *KeyPair `json:"masterKey"`
 }

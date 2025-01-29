@@ -1,0 +1,12 @@
+# @name Start
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.Start",
+    "params": [
+        {
+            "storageFilePath": "{{storageFilePath}}"
+        }
+    ]
+}

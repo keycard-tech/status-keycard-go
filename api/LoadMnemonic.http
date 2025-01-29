@@ -1,0 +1,12 @@
+# @name LoadMnemonic
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.LoadMnemonic",
+    "params": [
+        {
+            "mnemonic": "tiger worth relief food limb glad recycle similar wreck work region uncover"
+        }
+    ]
+}

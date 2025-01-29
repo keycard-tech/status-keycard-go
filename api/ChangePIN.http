@@ -1,0 +1,12 @@
+# @name ChangePIN
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.ChangePIN",
+    "params": [
+        {
+            "newPIN": "654321"
+        }
+    ]
+}

@@ -1,0 +1,13 @@
+# @name Unblock
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.Unblock",
+    "params": [
+        {
+            "puk": "654321654321",
+            "newPIN": "654321"
+        }
+    ]
+}

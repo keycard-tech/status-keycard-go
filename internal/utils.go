@@ -2,9 +2,10 @@ package internal
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/ebfe/scard"
-	keycard "github.com/status-im/keycard-go"
+	"github.com/status-im/keycard-go"
 	"github.com/status-im/keycard-go/derivationpath"
 	ktypes "github.com/status-im/keycard-go/types"
 )
@@ -54,6 +55,46 @@ func ToAppInfo(r *ktypes.ApplicationInfo) ApplicationInfo {
 		Version:        BytesToInt(r.Version),
 		AvailableSlots: BytesToInt(r.AvailableSlots),
 		KeyUID:         r.KeyUID,
+	}
+}
+
+func ParseVersion(input []byte) string {
+	if len(input) == 0 {
+		return ""
+	}
+	if len(input) != 2 {
+		return "unexpected version format"
+	}
+
+	major := input[0]
+	minor := input[1]
+	return fmt.Sprintf("%d.%d", major, minor)
+}
+
+func ToAppInfoV2(r *ktypes.ApplicationInfo) *ApplicationInfoV2 {
+	if r == nil {
+		return nil
+	}
+	return &ApplicationInfoV2{
+		Installed:      r.Installed,
+		Initialized:    r.Initialized,
+		InstanceUID:    r.InstanceUID,
+		versionRaw:     BytesToInt(r.Version),
+		Version:        ParseVersion(r.Version),
+		AvailableSlots: BytesToInt(r.AvailableSlots),
+		KeyUID:         r.KeyUID,
+	}
+}
+
+func ToAppStatus(r *ktypes.ApplicationStatus) *ApplicationStatus {
+	if r == nil {
+		return nil
+	}
+	return &ApplicationStatus{
+		RemainingAttemptsPIN: r.PinRetryCount,
+		RemainingAttemptsPUK: r.PUKRetryCount,
+		KeyInitialized:       r.KeyInitialized,
+		Path:                 r.Path,
 	}
 }
 

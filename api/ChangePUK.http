@@ -1,0 +1,12 @@
+# @name ChangePUK
+POST {{address}}/rpc
+
+{
+    "id": "{{$random.uuid}}",
+    "method": "keycard.ChangePUK",
+    "params": [
+        {
+            "newPuk": "654321654322"
+        }
+    ]
+}
