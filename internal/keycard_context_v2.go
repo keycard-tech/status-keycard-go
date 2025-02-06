@@ -669,8 +669,8 @@ func (kc *KeycardContextV2) FactoryReset() error {
 }
 
 func (kc *KeycardContextV2) GetMetadata() (*Metadata, error) {
-	if err := kc.keycardReady(); err != nil {
-		return nil, err
+	if !kc.keycardConnected() {
+		return nil, errKeycardNotConnected
 	}
 
 	data, err := kc.cmdSet.GetData(keycard.P1StoreDataPublic)
