@@ -237,8 +237,8 @@ func (s *KeycardService) GetMetadata(args *struct{}, reply *GetMetadataResponse)
 }
 
 type StoreMetadataRequest struct {
-	Name  string   `json:"name" validate:"required"`
-	Paths []string `json:"paths" validate:""`
+	Name  string   `json:"name"`
+	Paths []string `json:"paths"`
 }
 
 func (s *KeycardService) StoreMetadata(args *StoreMetadataRequest, reply *struct{}) error {

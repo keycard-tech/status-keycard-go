@@ -669,7 +669,7 @@ func (kc *KeycardContextV2) FactoryReset() error {
 }
 
 func (kc *KeycardContextV2) GetMetadata() (*Metadata, error) {
-	if err := kc.keycardReady(); err != nil {
+	if err := kc.keycardInitialized(); err != nil {
 		return nil, err
 	}
 
