@@ -1,9 +1,6 @@
 package session
 
 import (
-	goerrors "errors"
-
-	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
 
 	"github.com/status-im/status-keycard-go/internal"
@@ -12,17 +9,7 @@ import (
 
 var (
 	errKeycardServiceNotStarted = errors.New("keycard service not started")
-	validate                    = validator.New()
 )
-
-func validateRequest(v interface{}) error {
-	err := validate.Struct(v)
-	if err != nil {
-		errs := err.(validator.ValidationErrors)
-		return goerrors.Join(errs)
-	}
-	return nil
-}
 
 type KeycardService struct {
 	keycardContext *internal.KeycardContextV2
@@ -191,7 +178,7 @@ func (s *KeycardService) GenerateMnemonic(args *GenerateMnemonicRequest, reply *
 }
 
 type LoadMnemonicRequest struct {
-	Mnemonic   string `json:"mnemonic" validate:"required"`
+	Mnemonic   string `json:"mnemonic" validate:"required,mnemonic"`
 	Passphrase string `json:"passphrase"`
 }
 
