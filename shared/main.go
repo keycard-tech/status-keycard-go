@@ -1,6 +1,15 @@
 package main
 
-import "errors"
+// #cgo LDFLAGS: -shared
+// #include <stdlib.h>
+import "C"
+
+import (
+	"errors"
+	"unsafe"
+
+	"github.com/status-im/status-keycard-go/signal"
+)
 
 func main() {}
 
@@ -27,4 +36,20 @@ func checkAPIMutualExclusion(requestedAPI api) error {
 	}
 
 	return nil
+}
+
+//export KeycardSetSignalEventCallback
+func KeycardSetSignalEventCallback(cb unsafe.Pointer) {
+	signal.KeycardSetSignalEventCallback(cb)
+}
+
+//export ResetAPI
+func ResetAPI() {
+	globalFlow = nil
+	globalRPCServer = nil
+}
+
+//export Free
+func Free(param unsafe.Pointer) {
+	C.free(param)
 }
