@@ -7,10 +7,8 @@ import "C"
 import (
 	"encoding/json"
 	"errors"
-	"unsafe"
 
 	"github.com/status-im/status-keycard-go/pkg/flow"
-	"github.com/status-im/status-keycard-go/signal"
 )
 
 var (
@@ -90,16 +88,6 @@ func KeycardCancelFlow() *C.char {
 
 	err := globalFlow.Cancel()
 	return retErr(err)
-}
-
-//export Free
-func Free(param unsafe.Pointer) {
-	C.free(param)
-}
-
-//export KeycardSetSignalEventCallback
-func KeycardSetSignalEventCallback(cb unsafe.Pointer) {
-	signal.KeycardSetSignalEventCallback(cb)
 }
 
 //export MockedLibRegisterKeycard
