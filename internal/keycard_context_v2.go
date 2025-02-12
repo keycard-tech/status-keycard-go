@@ -236,6 +236,7 @@ func (kc *KeycardContextV2) connectCard(ctx context.Context, readers ReadersStat
 	appInfo, err := kc.selectApplet()
 	err = kc.simulateError(err, simulatedSelectAppletError)
 	if err != nil {
+		kc.resetCardConnection()
 		kc.status.State = ConnectionError
 		return nil, errors.Wrap(err, "failed to select applet")
 	}
@@ -244,6 +245,7 @@ func (kc *KeycardContextV2) connectCard(ctx context.Context, readers ReadersStat
 	kc.status.AppInfo = appInfo
 
 	if !appInfo.Installed {
+		kc.resetCardConnection()
 		kc.status.State = NotKeycard
 		return nil, nil
 	}
@@ -859,9 +861,9 @@ func (kc *KeycardContextV2) simulateError(currentError, errorToSimulate error) e
 	}
 	switch errorToSimulate {
 	case simulatedCardConnectError:
-		fallthrough
-	case simulatedSelectAppletError:
 		kc.resetCardConnection() // Make it look like we never connected
+	case simulatedSelectAppletError:
+		break // Do nothing
 	}
 	return errorToSimulate
 }
