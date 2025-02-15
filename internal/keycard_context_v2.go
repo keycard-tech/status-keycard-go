@@ -500,6 +500,10 @@ func (kc *KeycardContextV2) selectApplet() (*ApplicationInfoV2, error) {
 }
 
 func (kc *KeycardContextV2) updateApplicationStatus() error {
+	if err := kc.keycardInitialized(); err != nil {
+		return err
+	}
+
 	appStatus, err := kc.cmdSet.GetStatusApplication()
 	kc.status.AppStatus = ToAppStatus(appStatus)
 
