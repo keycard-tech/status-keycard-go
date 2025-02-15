@@ -96,8 +96,8 @@ func (s *KeycardService) Authorize(args *AuthorizeRequest, reply *AuthorizeRespo
 		return errKeycardServiceNotStarted
 	}
 
-	err := s.keycardContext.VerifyPIN(args.PIN)
-	reply.Authorized = err == nil
+	err, authorized := s.keycardContext.VerifyPIN(args.PIN)
+	reply.Authorized = authorized
 	return err
 }
 

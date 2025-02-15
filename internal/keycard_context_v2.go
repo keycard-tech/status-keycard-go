@@ -565,18 +565,27 @@ func (kc *KeycardContextV2) onAuthorizeInteractions(authorized bool) {
 	kc.publishStatus()
 }
 
-func (kc *KeycardContextV2) VerifyPIN(pin string) (err error) {
-	if err = kc.keycardReady(); err != nil {
-		return err
+func (kc *KeycardContextV2) VerifyPIN(pin string) (err error, authorized bool) {
+	if err := kc.keycardReady(); err != nil {
+		return err, false
 	}
 
 	defer func() {
-		authorized := err == nil
+		authorized := err == nil && authorized
 		kc.onAuthorizeInteractions(authorized)
 	}()
 
 	err = kc.cmdSet.VerifyPIN(pin)
-	return kc.checkSCardError(err, "VerifyPIN")
+
+	if err == nil {
+		return nil, true
+	}
+
+	if _, ok := err.(*keycard.WrongPINError); ok {
+		return nil, false
+	}
+
+	return kc.checkSCardError(err, "VerifyPIN"), false
 }
 
 func (kc *KeycardContextV2) ChangePIN(pin string) error {
