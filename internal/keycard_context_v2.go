@@ -575,7 +575,6 @@ func (kc *KeycardContextV2) VerifyPIN(pin string) (err error, authorized bool) {
 	}
 
 	defer func() {
-		authorized := err == nil && authorized
 		kc.onAuthorizeInteractions(authorized)
 	}()
 
