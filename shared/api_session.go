@@ -4,13 +4,11 @@ import "C"
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http/httptest"
 
 	"github.com/gorilla/rpc"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-keycard-go/pkg/session"
 )
@@ -38,19 +36,11 @@ func KeycardInitializeRPC() *C.char {
 		return marshalError(err)
 	}
 
-	// TEMP: Replace with logging to a file, take the path as an argument
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		fmt.Printf("failed to initialize log: %v\n", err)
-	}
-	zap.ReplaceGlobals(logger)
-
 	rpcServer, err := session.CreateRPCServer()
 	if err != nil {
 		return marshalError(err)
 	}
 	globalRPCServer = rpcServer
-	logger.Info("RPC server initialized")
 	return marshalError(nil)
 }
 

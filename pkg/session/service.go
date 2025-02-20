@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/status-im/status-keycard-go/internal"
+	"github.com/status-im/status-keycard-go/pkg/pairing"
 	"github.com/status-im/status-keycard-go/pkg/utils"
 )
 
@@ -17,7 +18,14 @@ type KeycardService struct {
 }
 
 type StartRequest struct {
+	// StorageFilePath is the path to the file where the keycard pairings information is stored.
 	StorageFilePath string `json:"storageFilePath" validate:"required"`
+
+	// LogEnabled is a flag to enable logging
+	LogEnabled bool `json:"logEnabled,omitempty"`
+
+	// LogFilePath is the path to the log file. When empty, logs go to stdout.
+	LogFilePath string `json:"logFilePath,omitempty"`
 }
 
 func (s *KeycardService) Start(args *StartRequest, reply *struct{}) error {
@@ -25,8 +33,17 @@ func (s *KeycardService) Start(args *StartRequest, reply *struct{}) error {
 		return errors.New("keycard service already started")
 	}
 
-	var err error
-	s.keycardContext, err = internal.NewKeycardContextV2(args.StorageFilePath)
+	pairingsStore, err := pairing.NewStore(args.StorageFilePath)
+	if err != nil {
+		return errors.Wrap(err, "failed to create pairing store")
+	}
+
+	options := []internal.Option{
+		internal.WithStorage(pairingsStore),
+		internal.WithLogging(args.LogEnabled, args.LogFilePath),
+	}
+
+	s.keycardContext, err = internal.NewKeycardContextV2(options)
 	if err != nil {
 		return err
 	}

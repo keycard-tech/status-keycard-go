@@ -8,9 +8,9 @@ import (
 	"syscall"
 
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/status-im/status-keycard-go/cmd/status-keycard-server/server"
+	"github.com/status-im/status-keycard-go/internal/logging"
 )
 
 var (
@@ -20,13 +20,10 @@ var (
 
 func init() {
 	var err error
-	config := zap.NewDevelopmentConfig()
-	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	rootLogger, err = config.Build()
+	rootLogger, err = logging.BuildDevelopmentLogger()
 	if err != nil {
 		fmt.Printf("failed to initialize log: %v\n", err)
 	}
-	zap.ReplaceGlobals(rootLogger)
 }
 
 func main() {
