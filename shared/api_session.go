@@ -30,8 +30,17 @@ func marshalError(err error) *C.char {
 	return C.CString(string(responseBytes))
 }
 
+func logPanic() {
+	err := recover()
+	if err != nil {
+		fmt.Printf("Panic: %v\n", err)
+	}
+}
+
 //export KeycardInitializeRPC
 func KeycardInitializeRPC() *C.char {
+	defer logPanic()
+
 	if err := checkAPIMutualExclusion(sessionAPI); err != nil {
 		return marshalError(err)
 	}
@@ -46,6 +55,8 @@ func KeycardInitializeRPC() *C.char {
 
 //export KeycardCallRPC
 func KeycardCallRPC(payload *C.char) *C.char {
+	defer logPanic()
+
 	if globalRPCServer == nil {
 		return marshalError(errors.New("RPC server not initialized"))
 	}
