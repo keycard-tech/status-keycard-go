@@ -34,6 +34,16 @@ var (
 	errKeycardNotBlocked     = errors.New("keycard not blocked")
 )
 
+type transmitRequest struct {
+	data            []byte
+	responseChannel chan *transmitResponse
+}
+
+type transmitResponse struct {
+	data []byte
+	err  error
+}
+
 type KeycardContextV2 struct {
 	KeycardContext
 
@@ -43,17 +53,34 @@ type KeycardContextV2 struct {
 	pairings   *pairing.Store
 	status     *Status
 
+	transmitContext context.Context
+	transmitChannel chan *transmitRequest
+
 	// simulation options
 	simulatedError error
+}
+
+// Transmit implements the Channel and Transmitter interfaces
+func (kc *KeycardContextV2) Transmit(apdu []byte) ([]byte, error) {
+	responseChannel := make(chan *transmitResponse, 1)
+	kc.transmitChannel <- &transmitRequest{
+		data:            apdu,
+		responseChannel: responseChannel,
+	}
+
+	select {
+	case <-kc.transmitContext.Done():
+		return nil, errors.New("transmit context done")
+	case rpdu := <-responseChannel:
+		return rpdu.data, rpdu.err
+	}
 }
 
 func NewKeycardContextV2(options []Option) (*KeycardContextV2, error) {
 
 	kc := &KeycardContextV2{
-		KeycardContext: KeycardContext{
-			command: make(chan commandType),
-		},
-		status: NewStatus(),
+		transmitChannel: make(chan *transmitRequest, 10),
+		status:          NewStatus(),
 	}
 
 	for _, option := range options {
@@ -76,6 +103,10 @@ func (kc *KeycardContextV2) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	kc.shutdown = cancel
 	kc.forceScanC = nil
+
+	// NOTE: It is not correct to store Context, but there was no better way
+	// to pass it to `Transmit` function, which is called from the `keycard-go` package.
+	kc.transmitContext = ctx
 
 	go kc.cardCommunicationRoutine(ctx)
 	kc.startDetectionLoop(ctx)
@@ -112,15 +143,14 @@ func (kc *KeycardContextV2) cardCommunicationRoutine(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case cmd := <-kc.command:
-			switch cmd {
-			case Transmit:
-				kc.rpdu, kc.runErr = kc.card.Transmit(kc.apdu)
-				kc.command <- Ack
-			case Close:
+		case apdu, ok := <-kc.transmitChannel:
+			if !ok {
 				return
-			default:
-				break
+			}
+			rpdu, err := kc.card.Transmit(apdu.data)
+			apdu.responseChannel <- &transmitResponse{
+				data: rpdu,
+				err:  err,
 			}
 		}
 	}
