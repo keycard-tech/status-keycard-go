@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ebfe/scard"
@@ -57,6 +58,10 @@ type KeycardContextV2 struct {
 	transmitContext context.Context
 	transmitChannel chan *transmitRequest
 
+	// cmdSetMutex is needed to ensure that the last response in secure channel
+	// is parsed before attempting to send a new request.
+	cmdSetMutex *sync.Mutex
+
 	// simulation options
 	simulatedError error
 }
@@ -82,6 +87,7 @@ func NewKeycardContextV2(options []Option) (*KeycardContextV2, error) {
 	kc := &KeycardContextV2{
 		transmitChannel: make(chan *transmitRequest, 10),
 		status:          NewStatus(),
+		cmdSetMutex:     &sync.Mutex{},
 	}
 
 	for _, option := range options {
@@ -527,6 +533,9 @@ func (kc *KeycardContextV2) checkSCardError(err error, context string) error {
 }
 
 func (kc *KeycardContextV2) selectApplet() (*ApplicationInfoV2, error) {
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
 	info, err := kc.SelectApplet()
 	if err != nil {
 		return nil, err
@@ -539,6 +548,9 @@ func (kc *KeycardContextV2) updateApplicationStatus() error {
 	if err := kc.keycardInitialized(); err != nil {
 		return err
 	}
+
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
 
 	appStatus, err := kc.cmdSet.GetStatusApplication()
 	kc.status.AppStatus = ToAppStatus(appStatus)
@@ -582,6 +594,9 @@ func (kc *KeycardContextV2) Initialize(pin, puk, pairingPassword string) error {
 		return errKeycardNotConnected
 	}
 
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
 	secrets := keycard.NewSecrets(pin, puk, pairingPassword)
 	err := kc.cmdSet.Init(secrets)
 	if err != nil {
@@ -614,6 +629,9 @@ func (kc *KeycardContextV2) VerifyPIN(pin string) (err error, authorized bool) {
 		kc.onAuthorizeInteractions(authorized)
 	}()
 
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
 	err = kc.cmdSet.VerifyPIN(pin)
 
 	if err == nil {
@@ -636,6 +654,9 @@ func (kc *KeycardContextV2) ChangePIN(pin string) error {
 		kc.onAuthorizeInteractions(false)
 	}()
 
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
 	err := kc.cmdSet.ChangePIN(pin)
 	return kc.checkSCardError(err, "ChangePIN")
 }
@@ -654,6 +675,9 @@ func (kc *KeycardContextV2) UnblockPIN(puk string, newPIN string) (err error) {
 		kc.onAuthorizeInteractions(authorized)
 	}()
 
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
 	err = kc.cmdSet.UnblockPIN(puk, newPIN)
 	return kc.checkSCardError(err, "UnblockPIN")
 }
@@ -667,6 +691,9 @@ func (kc *KeycardContextV2) ChangePUK(puk string) error {
 		kc.onAuthorizeInteractions(false)
 	}()
 
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
 	err := kc.cmdSet.ChangePUK(puk)
 	return kc.checkSCardError(err, "ChangePUK")
 }
@@ -675,6 +702,9 @@ func (kc *KeycardContextV2) GenerateMnemonic(mnemonicLength int) ([]int, error) 
 	if err := kc.keycardReady(); err != nil {
 		return nil, err
 	}
+
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
 
 	indexes, err := kc.cmdSet.GenerateMnemonic(mnemonicLength / 3)
 	return indexes, kc.checkSCardError(err, "GenerateMnemonic")
@@ -697,6 +727,9 @@ func (kc *KeycardContextV2) LoadMnemonic(mnemonic string, password string) ([]by
 		kc.publishStatus()
 	}()
 
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
 	seed := kc.mnemonicToBinarySeed(mnemonic, password)
 	keyUID, err = kc.loadSeed(seed)
 	return keyUID, kc.checkSCardError(err, "LoadMnemonic")
@@ -710,7 +743,9 @@ func (kc *KeycardContextV2) FactoryReset() error {
 	kc.status.Reset(FactoryResetting)
 	kc.publishStatus()
 
-	kc.logger.Debug("factory reset")
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
 	err := kc.KeycardContext.FactoryReset(true)
 
 	// Reset card connection to read the card data
@@ -723,6 +758,14 @@ func (kc *KeycardContextV2) GetMetadata() (*Metadata, error) {
 	if err := kc.keycardInitialized(); err != nil {
 		return nil, err
 	}
+
+	kc.logger.Debug("acquiring mutex - GetMetadata")
+
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
+	kc.logger.Debug("acquired mutex - GetMetadata")
+	defer kc.logger.Debug("finished - GetMetadata")
 
 	data, err := kc.cmdSet.GetData(keycard.P1StoreDataPublic)
 	if err != nil {
@@ -787,6 +830,9 @@ func (kc *KeycardContextV2) StoreMetadata(name string, paths []string) (err erro
 		kc.publishStatus()
 	}()
 
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
+
 	err = kc.cmdSet.StoreData(keycard.P1StoreDataPublic, metadata.Serialize())
 	return kc.checkSCardError(err, "StoreMetadata")
 }
@@ -810,6 +856,9 @@ func (kc *KeycardContextV2) exportKey(path string, exportOption uint8) (*KeyPair
 	//    that doesn't correctly export the public key for the master path unless it is also the current path.
 	const derive = true
 	makeCurrent := path == MasterPath
+
+	kc.cmdSetMutex.Lock()
+	defer kc.cmdSetMutex.Unlock()
 
 	exportedKey, err := kc.cmdSet.ExportKeyExtended(derive, makeCurrent, exportOption, path)
 	if err != nil {
@@ -839,6 +888,11 @@ func (kc *KeycardContextV2) ExportLoginKeys() (*LoginKeys, error) {
 
 	var err error
 	keys := &LoginKeys{}
+
+	kc.logger.Debug("acquiring mutex - ExportLoginKeys")
+
+	kc.logger.Debug("acquired mutex - ExportLoginKeys")
+	defer kc.logger.Debug("finished - ExportLoginKeys")
 
 	keys.EncryptionPrivateKey, err = kc.exportKey(EncryptionPath, keycard.P2ExportKeyPrivateAndPublic)
 	if err != nil {
