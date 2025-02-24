@@ -32,6 +32,7 @@ var (
 	errKeycardNotReady       = errors.New("keycard not ready")
 	errKeycardNotAuthorized  = errors.New("keycard not authorized")
 	errKeycardNotBlocked     = errors.New("keycard not blocked")
+	errKeycardNoKeys         = errors.New("keycard has not keys")
 )
 
 type transmitRequest struct {
@@ -502,6 +503,13 @@ func (kc *KeycardContextV2) keycardAuthorized() error {
 	return nil
 }
 
+func (kc *KeycardContextV2) keycardHasKeys() error {
+	if !kc.status.AppStatus.KeyInitialized {
+		return errKeycardNoKeys
+	}
+	return nil
+}
+
 func (kc *KeycardContextV2) checkSCardError(err error, context string) error {
 	if err == nil {
 		return nil
@@ -685,6 +693,7 @@ func (kc *KeycardContextV2) LoadMnemonic(mnemonic string, password string) ([]by
 			return
 		}
 		kc.status.AppInfo.KeyUID = keyUID
+		kc.status.AppStatus.KeyInitialized = true
 		kc.publishStatus()
 	}()
 
@@ -822,6 +831,9 @@ func (kc *KeycardContextV2) exportKey(path string, exportOption uint8) (*KeyPair
 
 func (kc *KeycardContextV2) ExportLoginKeys() (*LoginKeys, error) {
 	if err := kc.keycardAuthorized(); err != nil {
+		return nil, err
+	}
+	if err := kc.keycardHasKeys(); err != nil {
 		return nil, err
 	}
 
