@@ -6,7 +6,9 @@ POST {{address}}/rpc
     "method": "keycard.Start",
     "params": [
         {
-            "storageFilePath": "{{storageFilePath}}"
+            "storageFilePath": "{{storageFilePath}}",
+            "logEnabled": true,
+            "logFilePath": ""
         }
     ]
 }

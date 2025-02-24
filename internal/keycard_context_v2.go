@@ -47,19 +47,17 @@ type KeycardContextV2 struct {
 	simulatedError error
 }
 
-func NewKeycardContextV2(pairingsStoreFilePath string) (*KeycardContextV2, error) {
-	pairingsStore, err := pairing.NewStore(pairingsStoreFilePath)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create pairing store")
-	}
+func NewKeycardContextV2(options []Option) (*KeycardContextV2, error) {
 
 	kc := &KeycardContextV2{
 		KeycardContext: KeycardContext{
 			command: make(chan commandType),
 		},
-		logger:   zap.L().Named("context"),
-		pairings: pairingsStore,
-		status:   NewStatus(),
+		status: NewStatus(),
+	}
+
+	for _, option := range options {
+		option(kc)
 	}
 
 	return kc, nil
