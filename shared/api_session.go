@@ -43,6 +43,8 @@ func logPanic() {
 func KeycardInitializeRPC() *C.char {
 	defer logPanic()
 
+	zap.L().Info("KeycardInitializeRPC - start")
+
 	if err := checkAPIMutualExclusion(sessionAPI); err != nil {
 		return marshalError(err)
 	}
@@ -52,6 +54,8 @@ func KeycardInitializeRPC() *C.char {
 		return marshalError(err)
 	}
 	globalRPCServer = rpcServer
+
+	zap.L().Info("KeycardInitializeRPC - ok")
 	return marshalError(nil)
 }
 
@@ -59,7 +63,7 @@ func KeycardInitializeRPC() *C.char {
 func KeycardCallRPC(payload *C.char) *C.char {
 	defer logPanic()
 
-	zap.L().Debug("Calling RPC", zap.String("payload", C.GoString(payload)))
+	zap.L().Info("Calling RPC", zap.String("payload", C.GoString(payload)))
 
 	if globalRPCServer == nil {
 		return marshalError(errors.New("RPC server not initialized"))
@@ -74,25 +78,25 @@ func KeycardCallRPC(payload *C.char) *C.char {
 	// Create a fake HTTP response writer
 	rr := httptest.NewRecorder()
 
-	zap.L().Debug("ServeHTTP call")
+	zap.L().Info("ServeHTTP call")
 
 	// Call the server's ServeHTTP method
 	globalRPCServer.ServeHTTP(rr, req)
 
-	zap.L().Debug("ServeHTTP ok")
+	zap.L().Info("ServeHTTP ok")
 
 	// Read and return the response body
 	resp := rr.Result()
 	defer resp.Body.Close()
 
-	zap.L().Debug("ServeHTTP resp", zap.String("status", resp.Status))
+	zap.L().Info("ServeHTTP resp", zap.String("status", resp.Status))
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return marshalError(errors.Wrap(err, "internal error reading response body"))
 	}
 
-	zap.L().Debug("KeycardCallRPC returning", zap.String("body", string(body)))
+	zap.L().Info("KeycardCallRPC returning", zap.String("body", string(body)))
 
 	return C.CString(string(body))
 }
