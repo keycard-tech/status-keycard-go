@@ -468,8 +468,6 @@ func (kc *KeycardContextV2) Stop() {
 		}
 	}
 
-	kc.KeycardContext.Stop()
-
 	if kc.shutdown != nil {
 		kc.shutdown()
 	}
