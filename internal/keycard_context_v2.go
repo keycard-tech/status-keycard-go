@@ -304,6 +304,10 @@ func (kc *KeycardContextV2) watchActiveReader(ctx context.Context, activeReader 
 	for {
 		err := kc.cardCtx.GetStatusChange(readersStates, zeroTimeout)
 
+		if err == scard.ErrUnknownReader {
+			break
+		}
+
 		if err != nil && err != scard.ErrTimeout {
 			kc.logger.Error("failed to get status change", zap.Error(err))
 			return
@@ -335,7 +339,7 @@ func (kc *KeycardContextV2) watchActiveReader(ctx context.Context, activeReader 
 func (kc *KeycardContextV2) getCurrentReadersState() (ReadersStates, error) {
 	readers, err := kc.cardCtx.ListReaders()
 	err = kc.simulateError(err, simulatedListReadersError)
-	if err != nil {
+	if err != nil && err != scard.ErrNoReadersAvailable {
 		return nil, err
 	}
 
