@@ -6,6 +6,9 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
+	"runtime"
+	"sync"
 	"unsafe"
 
 	"github.com/status-im/status-keycard-go/signal"
@@ -20,6 +23,8 @@ const (
 	flowAPI
 	sessionAPI
 )
+
+var initOnce sync.Once
 
 func checkAPIMutualExclusion(requestedAPI api) error {
 	switch requestedAPI {
@@ -52,4 +57,23 @@ func ResetAPI() {
 //export Free
 func Free(param unsafe.Pointer) {
 	C.free(param)
+}
+
+//export InitializeLibrary
+func InitializeLibrary() {
+	initOnce.Do(func() {
+		fmt.Println("Starting Go runtime initialization")
+		// Force a garbage collection to initialize GC state.
+		runtime.GC()
+
+		// Spawn a dummy goroutine and wait for it to finish.
+		done := make(chan struct{})
+		go func() {
+			// Minimal work just to kick off the scheduler.
+			close(done)
+		}()
+		<-done
+
+		fmt.Println("Go runtime initialization complete")
+	})
 }
