@@ -6,6 +6,10 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
+	"runtime"
+	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/status-im/status-keycard-go/signal"
@@ -52,4 +56,27 @@ func ResetAPI() {
 //export Free
 func Free(param unsafe.Pointer) {
 	C.free(param)
+}
+
+var initOnce sync.Once
+
+//export InitializeStatusKeycardGo
+func InitializeStatusKeycardGo() {
+	initOnce.Do(func() {
+		fmt.Println("status-keycard-go: Starting Go runtime initialization")
+		time.Sleep(1 * time.Second)
+
+		// Force a garbage collection to initialize GC state.
+		runtime.GC()
+
+		// Spawn a dummy goroutine and wait for it to finish.
+		done := make(chan struct{})
+		go func() {
+			// Minimal work just to kick off the scheduler.
+			close(done)
+		}()
+		<-done
+
+		fmt.Println("status-keycard-go: Go runtime initialization complete")
+	})
 }

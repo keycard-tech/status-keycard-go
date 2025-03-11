@@ -10,7 +10,7 @@ endif
 
 ifeq ($(detected_OS),Darwin)
  LIB_EXT := dylib
- CGOFLAGS := CGO_ENABLED=1 GOOS=darwin
+ CGOFLAGS := CGO_ENABLED=1 GOOS=darwin GOARCH=amd64
 else ifeq ($(detected_OS),Windows)
  LIB_EXT:= dll
  LIBKEYCARD_EXT := dll
