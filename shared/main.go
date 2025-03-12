@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
-	"time"
 	"unsafe"
 
 	"github.com/status-im/status-keycard-go/signal"
@@ -63,8 +62,8 @@ var initOnce sync.Once
 //export InitializeStatusKeycardGo
 func InitializeStatusKeycardGo() {
 	initOnce.Do(func() {
-		fmt.Println("status-keycard-go: Starting Go runtime initialization")
-		time.Sleep(1 * time.Second)
+		fmt.Println("👉 status-keycard-go: Starting Go runtime initialization")
+		defer fmt.Println("✅ status-keycard-go: Go runtime initialization complete")
 
 		// Force a garbage collection to initialize GC state.
 		runtime.GC()
@@ -76,7 +75,5 @@ func InitializeStatusKeycardGo() {
 			close(done)
 		}()
 		<-done
-
-		fmt.Println("status-keycard-go: Go runtime initialization complete")
 	})
 }
