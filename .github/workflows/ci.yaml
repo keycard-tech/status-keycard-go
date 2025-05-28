@@ -55,3 +55,23 @@ jobs:
       contents: read      # Required: allow read access to the content for analysis.
       pull-requests: read # Optional: allow read access to pull request. Use with `only-new-issues` option.
       checks: write
+
+  go-mod-check:
+    name: mod
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install pcsc-lite
+        run: sudo apt-get install -y libpcsclite-dev
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Check go mod tidy
+        run: go mod tidy && git diff --exit-code go.mod go.sum
+  
+      - name: Check go mod vendor
+        run: go mod vendor && git diff --exit-code vendor
